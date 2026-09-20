@@ -4,20 +4,25 @@ export const markImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.co
 
 export default function Page() {
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[#050607] text-[#f5f5f2]" aria-label="Solar and battery plan">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_45%,rgba(23,111,89,.2),transparent_34%),linear-gradient(180deg,#050607_0%,#080a0b_100%)]" aria-hidden="true" />
-      <div className="absolute inset-x-[-25%] bottom-[-8%] h-[60%] opacity-35 mix-blend-screen" style={{ backgroundImage: `url(${floorImage})`, backgroundPosition: 'center bottom', backgroundSize: 'cover' }} aria-hidden="true" />
-      <header className="relative z-10 flex h-14 items-center justify-between border-b border-white/15 px-5 text-white sm:px-8">
-        <button type="button" aria-label="Switch to light mode" className="grid size-8 place-items-center text-xl text-white/85">☼</button>
-        <a href="#top" aria-label="currentundo home" className="text-[16px] font-medium tracking-tight"><span className="text-red-500">⚡</span> currentundo?</a>
-        <div className="flex items-center gap-5"><button type="button" className="text-[9px] text-white/80">EN</button><button type="button" aria-label="Refresh page" className="text-xl text-white/85">↻</button></div>
+    <main className="relative min-h-dvh overflow-hidden bg-[#03132f] text-white" aria-label="DiSun Energy International solar calculator">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#03132f_0%,#03132f_46%,rgba(3,19,47,.5)_100%)]" aria-hidden="true" />
+      <div className="absolute inset-x-[-12%] bottom-[-2%] h-[54%] bg-cover bg-bottom opacity-90" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#03132f]/20 to-transparent" aria-hidden="true" />
+
+      <header className="relative z-10 flex items-center justify-between px-5 pt-5 sm:px-8 sm:pt-7">
+        <a href="#top" aria-label="DiSun Energy International home" className="h-10 w-14 overflow-hidden rounded-lg bg-white"><img src={markImage} alt="DiSun Energy International logo" className="h-full w-full object-cover object-center" /></a>
+        <div className="flex items-center gap-4 text-white" aria-label="Social links">
+          <a href="#facebook" aria-label="Facebook" className="grid size-8 place-items-center rounded-full bg-white text-[#1260a4] transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-current"><path d="M13.5 22v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V4.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.3H8v3.1h2.4v8h3.1Z" /></svg></a>
+          <a href="#instagram" aria-label="Instagram" className="grid size-8 place-items-center rounded-full bg-white text-[#1260a4] transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" className="fill-current stroke-none" /></svg></a>
+        </div>
       </header>
-      <section id="top" className="relative z-10 mx-auto flex min-h-[calc(100dvh-56px)] max-w-xl flex-col px-5 pb-7 pt-28 text-center sm:pt-32">
-        <p className="text-[10px] font-semibold tracking-[0.32em] text-white/55">CURRENTUNDO ENERGY</p>
-        <h1 className="mt-5 text-[39px] font-medium leading-none tracking-[-0.06em] sm:text-6xl">Solar &amp; Battery</h1>
-        <p className="mx-auto mt-6 max-w-[350px] text-[16px] leading-[1.75] text-white/70 sm:text-lg">Power your Kerala home with rooftop solar and battery backup. Get a right-sized, non-binding plan in minutes — then a partner survey before any final quote.</p>
-        <dl className="mx-auto mt-10 grid w-full max-w-[370px] grid-cols-3 divide-x divide-white/15"><div className="px-2"><dd className="text-[17px] font-semibold">Right-sized</dd><dt className="mt-2 text-[10px] leading-[1.5] tracking-[0.13em] text-white/55">SYSTEM &amp;<br />BATTERY</dt></div><div className="px-2"><dd className="text-[17px] font-semibold">Up to ₹78,000</dd><dt className="mt-2 text-[10px] leading-[1.5] tracking-[0.13em] text-white/55">PM SURYA GHAR<br />SUBSIDY</dt></div><div className="px-2"><dd className="text-[17px] font-semibold">No deposit</dd><dt className="mt-2 text-[10px] leading-[1.5] tracking-[0.13em] text-white/55">FREE ESTIMATE</dt></div></dl>
-        <div className="mt-auto pt-16"><div className="mx-auto mb-7 flex items-center justify-center gap-10 text-2xl font-semibold tracking-[-0.08em] text-white/80"><span>adani</span><span className="h-7 w-px bg-white/20" /><span className="tracking-[-0.12em]">Deye</span></div><a href="#order" className="flex min-h-12 items-center justify-center rounded-full bg-white text-xs font-semibold tracking-[0.13em] text-[#101112] transition-transform hover:scale-[1.02]">ORDER NOW</a><a href="#feasibility" className="mt-4 block text-[13px] text-white/80 underline-offset-4 hover:underline">Check KSEB solar feasibility</a><p className="mt-6 text-[10px] text-white/45">No commitment · KSEB &amp; PM Surya Ghar guidance · Kerala only</p></div>
+
+      <section id="top" className="relative z-10 mx-auto flex min-h-[calc(100dvh-76px)] max-w-xl flex-col px-5 pb-6 pt-20 text-center sm:pt-24">
+        <p className="text-[15px] font-semibold tracking-[0.04em] text-white sm:text-lg">DiSun Energy International</p>
+        <h1 className="mt-8 text-[31px] font-extrabold leading-[1.02] tracking-[-0.045em] sm:text-5xl">POWER YOUR FUTURE<br /><span className="text-[43px] text-[#79d52a] sm:text-6xl">WITH SOLAR</span></h1>
+        <p className="mx-auto mt-5 max-w-[320px] text-[13px] leading-[1.45] text-white sm:text-base">Calculate your savings, check eligibility and take the next step towards <strong>Powerful future with SOLAR.</strong></p>
+        <dl className="mx-auto mt-10 grid w-full max-w-[370px] grid-cols-3 divide-x divide-white/35"><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 78000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">PM SURYA GHAR<br />SUBSIDY</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 200000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">BANK LOAN<br />AVAILABLE</dt></div><div className="px-2"><dd className="text-[16px] font-semibold leading-tight sm:text-lg">30 Years</dd><dt className="mt-3 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">WARRANTY<br />FOR PANELS</dt></div></dl>
+        <div className="mt-auto pt-12"><p className="mb-4 text-[14px] font-bold uppercase tracking-[0.02em] sm:text-lg">HOW MUCH POWER NEED TO MY HOME?</p><a href="#calculate" className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03]">CALCULATE NOW <span className="ml-2 text-[#2e8dbe]">&gt;</span></a><p className="mt-5 text-[10px] text-white/90">By continuing, you agree to our <a className="underline" href="#privacy">Privacy policy</a> and <a className="underline" href="#terms">Terms&amp;Conditions</a></p></div>
       </section>
     </main>
   )
