@@ -3,8 +3,8 @@ const markImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image
 
 export default function Page() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#02122d] text-white">
-      <section className="relative min-h-[715px] bg-[#02122d]">
+    <main className="relative h-dvh overflow-hidden bg-[#02122d] text-white">
+      <section className="relative h-[calc(100dvh-91px)] min-h-0 bg-[#02122d]">
         <div className="absolute inset-x-0 bottom-0 h-[57%] bg-cover bg-bottom" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#02122d_0%,#02122d_43%,rgba(2,18,45,.72)_69%,rgba(2,18,45,.2)_100%)]" aria-hidden="true" />
         <header className="relative z-10 flex h-[59px] items-center justify-between rounded-b-[22px] bg-white px-4 shadow-[0_8px_18px_rgba(0,0,0,.2)]">
@@ -21,7 +21,7 @@ export default function Page() {
           <p className="mt-5 text-[10px] font-medium">By continuing, you agree to our <a className="text-[#315477] underline" href="#privacy">Privacy policy</a> and <a className="text-[#315477] underline" href="#terms">Terms&amp;Conditions</a></p>
         </div>
       </section>
-      <section id="book" className="bg-white px-0 pb-8 pt-8"><div className="mx-auto flex max-w-[390px] items-center gap-3 rounded-t-[17px] border border-[#d9dde5] bg-white px-8 py-4 text-[#182433] shadow-[0_-5px_13px_rgba(0,0,0,.25)]"><span className="text-3xl text-[#e7bf2e]">☀</span><div className="flex-1"><h2 className="text-[14px] font-bold">Ready to Go Solar?</h2><p className="text-[10px] text-[#555]">Book your free site visit Now</p></div><a href="mailto:hello@solar.com" className="rounded-full border-2 border-[#62a82a] bg-[#36a21d] px-3 py-2 text-[10px] font-bold text-white shadow-[inset_0_0_0_2px_white]">BOOK VISIT &gt;</a></div></section>
+      <section id="book" className="absolute inset-x-0 bottom-0 z-30 bg-white px-0 pb-3 pt-3"><div className="mx-auto flex max-w-[390px] items-center gap-3 rounded-t-[17px] border border-[#d9dde5] bg-white px-8 py-4 text-[#182433] shadow-[0_-5px_13px_rgba(0,0,0,.25)]"><span className="text-3xl text-[#e7bf2e]">☀</span><div className="flex-1"><h2 className="text-[14px] font-bold">Ready to Go Solar?</h2><p className="text-[10px] text-[#555]">Book your free site visit Now</p></div><a href="mailto:hello@solar.com" className="rounded-full border-2 border-[#62a82a] bg-[#36a21d] px-3 py-2 text-[10px] font-bold text-white shadow-[inset_0_0_0_2px_white]">BOOK VISIT &gt;</a></div></section>
     </main>
   )
 }
