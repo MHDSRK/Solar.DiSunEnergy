@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Nexora — Build what’s next',
+  description: 'Nexora is a studio for the future-minded.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -26,11 +26,11 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  colorScheme: 'dark',
+  themeColor: '#020f25',
 }
 
 export default function RootLayout({
