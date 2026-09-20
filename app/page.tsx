@@ -9,10 +9,10 @@ export default function Page() {
       <div className="absolute inset-x-[-12%] bottom-[-2%] h-[54%] bg-cover bg-bottom opacity-90" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#03132f]/20 to-transparent" aria-hidden="true" />
 
-      <header className="relative z-10 flex items-center justify-between px-5 pt-5 sm:px-8 sm:pt-7">
+      <header className="relative z-10 flex h-[64px] items-center justify-between rounded-b-[24px] bg-white px-5 pt-1 shadow-[0_8px_20px_rgba(0,0,0,.24)] sm:px-8">
         <a href="#top" aria-label="DiSun Energy International home" className="h-10 w-14 overflow-hidden rounded-lg bg-white"><img src={markImage} alt="DiSun Energy International logo" className="h-full w-full object-cover object-center" /></a>
-        <div className="flex items-center gap-4 text-white" aria-label="Social links">
-          <a href="#facebook" aria-label="Facebook" className="grid size-8 place-items-center rounded-full bg-white text-[#1260a4] transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-current"><path d="M13.5 22v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V4.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.3H8v3.1h2.4v8h3.1Z" /></svg></a>
+        <div className="flex items-center gap-4 text-[#1260a4]" aria-label="Social links">
+          <a href="#facebook" aria-label="Facebook" className="grid size-8 place-items-center rounded-full bg-[#1260a4] text-white transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-current"><path d="M13.5 22v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V4.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.3H8v3.1h2.4v8h3.1Z" /></svg></a>
           <a href="#instagram" aria-label="Instagram" className="grid size-8 place-items-center rounded-full bg-white text-[#1260a4] transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" className="fill-current stroke-none" /></svg></a>
         </div>
       </header>
