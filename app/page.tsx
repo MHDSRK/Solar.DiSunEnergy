@@ -11,9 +11,8 @@ export default function Page() {
 
   return (
     <main className="relative min-h-dvh overflow-y-auto bg-[#03132f] text-white" aria-label="DiSun Energy International solar calculator" onScroll={(event) => setScrollProgress(Math.min(1, event.currentTarget.scrollTop / 150))}>
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#03132f_0%,#03132f_46%,rgba(3,19,47,.5)_100%)]" aria-hidden="true" />
-      <div className="absolute inset-x-[-12%] bottom-0 h-[62%] bg-cover bg-bottom opacity-100 mix-blend-screen" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
-      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#03132f]/20 to-transparent" aria-hidden="true" />
+      <div className="absolute inset-0 bg-[#03132f] bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,19,47,.08)_0%,rgba(3,19,47,.08)_48%,rgba(3,19,47,.18)_100%)]" aria-hidden="true" />
 
       <header className="sticky top-0 z-20 flex h-[64px] origin-top items-center justify-between rounded-b-[24px] bg-white px-5 pt-1 shadow-[0_8px_20px_rgba(0,0,0,.24)] transition-[height,transform] duration-0 sm:px-8" style={{ height: `${64 - scrollProgress * 20}px`, transform: `scale(${1 - scrollProgress * 0.08})`, transformOrigin: 'top center' }}>
         <a href="#top" aria-label="DiSun Energy International home" className="h-10 w-14 origin-left overflow-hidden rounded-lg bg-white transition-transform duration-75" style={{ transform: `scale(${1 - scrollProgress * 0.18})` }}><img src={markImage} alt="DiSun Energy International logo" className="h-full w-full object-cover object-center" /></a>
