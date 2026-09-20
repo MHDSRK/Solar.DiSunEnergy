@@ -1,23 +1,29 @@
+'use client'
+
+import { useState } from 'react'
+
 // Saved design assets for the next page iteration.
 export const floorImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image-C3090BE5-0zzyFAsUgRwLxLDeh1A2N1YUSLqpBi.jpeg'
 export const markImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image-B6267883-BYNKz4nIws4F3XvdcZk2uddggsWgeT.jpeg'
 
 export default function Page() {
+  const [scrollProgress, setScrollProgress] = useState(0)
+
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[#03132f] text-white" aria-label="DiSun Energy International solar calculator">
+    <main className="relative min-h-dvh overflow-y-auto bg-[#03132f] text-white" aria-label="DiSun Energy International solar calculator" onScroll={(event) => setScrollProgress(Math.min(1, event.currentTarget.scrollTop / 150))}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#03132f_0%,#03132f_46%,rgba(3,19,47,.5)_100%)]" aria-hidden="true" />
       <div className="absolute inset-x-[-12%] bottom-[-2%] h-[54%] bg-cover bg-bottom opacity-90" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#03132f]/20 to-transparent" aria-hidden="true" />
 
-      <header className="relative z-10 flex h-[64px] items-center justify-between rounded-b-[24px] bg-white px-5 pt-1 shadow-[0_8px_20px_rgba(0,0,0,.24)] sm:px-8">
-        <a href="#top" aria-label="DiSun Energy International home" className="h-10 w-14 overflow-hidden rounded-lg bg-white"><img src={markImage} alt="DiSun Energy International logo" className="h-full w-full object-cover object-center" /></a>
-        <div className="flex items-center gap-4 text-[#1260a4]" aria-label="Social links">
+      <header className="sticky top-0 z-20 flex h-[64px] origin-top items-center justify-between rounded-b-[24px] bg-white px-5 pt-1 shadow-[0_8px_20px_rgba(0,0,0,.24)] transition-[height,transform] duration-75 sm:px-8" style={{ height: `${64 - scrollProgress * 20}px`, transform: `scale(${1 - scrollProgress * 0.08})`, transformOrigin: 'top center' }}>
+        <a href="#top" aria-label="DiSun Energy International home" className="h-10 w-14 origin-left overflow-hidden rounded-lg bg-white transition-transform duration-75" style={{ transform: `scale(${1 - scrollProgress * 0.18})` }}><img src={markImage} alt="DiSun Energy International logo" className="h-full w-full object-cover object-center" /></a>
+        <div className="flex origin-right items-center gap-4 text-[#1260a4] transition-transform duration-75" style={{ transform: `scale(${1 - scrollProgress * 0.18})` }} aria-label="Social links">
           <a href="#facebook" aria-label="Facebook" className="grid size-8 place-items-center rounded-full bg-[#1260a4] text-white transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-current"><path d="M13.5 22v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V4.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.3H8v3.1h2.4v8h3.1Z" /></svg></a>
           <a href="#instagram" aria-label="Instagram" className="grid size-8 place-items-center rounded-full bg-white text-[#1260a4] transition-transform hover:scale-110"><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" className="fill-current stroke-none" /></svg></a>
         </div>
       </header>
 
-      <section id="top" className="relative z-10 mx-auto flex min-h-[calc(100dvh-76px)] max-w-xl flex-col px-5 pb-6 pt-20 text-center sm:pt-24">
+      <section id="top" className="relative z-10 mx-auto flex min-h-[calc(100vh+180px)] max-w-xl flex-col px-5 pb-6 pt-20 text-center sm:pt-24">
         <p className="text-[15px] font-semibold tracking-[0.04em] text-white sm:text-lg">DiSun Energy International</p>
         <h1 className="mt-8 text-[31px] font-extrabold leading-[1.02] tracking-[-0.045em] sm:text-5xl">POWER YOUR FUTURE<br /><span className="text-[43px] text-[#79d52a] sm:text-6xl">WITH SOLAR</span></h1>
         <p className="mx-auto mt-5 max-w-[320px] text-[13px] leading-[1.45] text-white sm:text-base">Calculate your savings, check eligibility and take the next step towards <strong>Powerful future with SOLAR.</strong></p>
