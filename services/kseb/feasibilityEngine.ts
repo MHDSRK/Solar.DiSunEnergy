@@ -31,7 +31,7 @@ export function normalizeTransformer(value: Record<string, unknown>): Transforme
 }
 
 export function calculateFeasibility(balanceAvailableKw: number, requestedKw: number) {
-  return { status: (balanceAvailableKw >= requestedKw ? 'PRELIMINARILY_FEASIBLE' : 'INSUFFICIENT_CAPACITY') as FeasibilityStatus, available: balanceAvailableKw >= requestedKw, remainingAfterInstallationKw: balanceAvailableKw - requestedKw }
+  return { status: (balanceAvailableKw >= requestedKw ? 'PRELIMINARILY_FEASIBLE' : 'INSUFFICIENT_CAPACITY') as FeasibilityStatus, available: balanceAvailableKw >= requestedKw, remainingAfterInstallationKw: balanceAvailableKw - requestedKw, capacityMessage: balanceAvailableKw > 40 ? 'CAPACITY APPEARS AVAILABLE' : 'CRITICAL, CAPACITY ABOUT TO END SOON' }
 }
 
 export function getBalanceStatus(_record: TransformerRecord) {
