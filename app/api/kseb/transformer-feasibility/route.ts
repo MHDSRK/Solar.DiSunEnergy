@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { decodeKsebConsumerNumber } from '@/services/kseb/consumerDecoder'
 import { calculateFeasibility, getBalanceStatus } from '@/services/kseb/feasibilityEngine'
-import { matchTransformers } from '@/services/kseb/transformerMatcher'
 import { fetchKsebRecap, resolveKsebSection } from '@/services/kseb/recapClient'
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { consumerNumber?: string; sectionId?: string; sectionOffice?: string; area?: string; requestedKw?: number; transformerName?: string }
+    const body = await request.json() as { consumerNumber?: string; sectionId?: string; sectionOffice?: string; requestedKw?: number; transformerId?: string; transformerName?: string }
     const requestedKw = Number(body.requestedKw)
     if (!Number.isFinite(requestedKw) || requestedKw <= 0) return NextResponse.json({ success: false, state: 'INVALID_REQUEST', message: 'Enter a valid requested solar capacity.' }, { status: 400 })
     const consumerNumber = body.consumerNumber?.trim() ?? ''
@@ -24,11 +23,10 @@ export async function POST(request: Request) {
     if (decoded?.valid && body.sectionOffice && decoded.sectionName.toLocaleLowerCase() !== body.sectionOffice.trim().toLocaleLowerCase()) return NextResponse.json({ success: false, state: 'SECTION_CONFLICT', message: 'Consumer number and selected KSEB section appear to be different.' }, { status: 409 })
     const recap = await fetchKsebRecap({ sectionId: section.sectionId })
     const transformerOptions = recap.records.map((record) => ({ id: record.id, name: record.transformerName, balanceAvailableKw: record.balanceAvailableKw }))
-    if (!body.area?.trim() && !body.transformerName?.trim()) return NextResponse.json({ success: true, status: 'TRANSFORMER_NOT_SELECTED', section: { sectionId: section.sectionId, sectionCode: section.sectionId, name: section.name, districtId: section.districtId }, transformers: transformerOptions, ksebDataTimestamp: recap.checkedAt, retrievedAt: recap.retrievedAt })
-    const matched = matchTransformers(recap.records, body.area, body.transformerName)
-    if (matched.status !== 'MATCH') return NextResponse.json({ success: false, state: matched.status === 'NO_MATCH' ? 'TRANSFORMER_NOT_IDENTIFIED' : 'MULTIPLE_TRANSFORMERS', message: matched.status === 'NO_MATCH' ? 'Transformer could not be identified from the supplied area.' : 'Please select the transformer serving your area.', matches: matched.matches.map((record) => ({ id: record.id, name: record.transformerName, feederName: record.feederName, balanceAvailableKw: record.balanceAvailableKw })) }, { status: 422 })
-    const feasibility = calculateFeasibility(matched.record.balanceAvailableKw, requestedKw)
-    return NextResponse.json({ success: true, status: feasibility.status, section: { sectionId: section.sectionId, sectionCode: section.sectionId, name: section.name, districtId: section.districtId }, area: body.area ?? '', transformer: matched.record, requestedKw, remainingAfterInstallationKw: feasibility.remainingAfterInstallationKw, balanceStatus: getBalanceStatus(matched.record), ksebDataTimestamp: recap.checkedAt, retrievedAt: recap.retrievedAt, source: { provider: 'KSEB', url: 'https://wss.kseb.in/selfservices/reCap' } })
+    const selected = recap.records.find((record) => (body.transformerId && record.id === body.transformerId) || (!body.transformerId && body.transformerName && record.transformerName === body.transformerName))
+    if (!selected) return NextResponse.json({ success: false, state: 'TRANSFORMER_NOT_SELECTED', message: recap.records.length ? 'Please select a transformer from the KSEB list.' : 'No transformer data is currently available for this section.', section: { sectionId: section.sectionId, sectionCode: section.sectionId, name: section.name, districtId: section.districtId }, transformers: transformerOptions, ksebDataTimestamp: recap.checkedAt, retrievedAt: recap.retrievedAt }, { status: 422 })
+    const feasibility = calculateFeasibility(selected.balanceAvailableKw, requestedKw)
+    return NextResponse.json({ success: true, status: feasibility.status, section: { sectionId: section.sectionId, sectionCode: section.sectionId, name: section.name, districtId: section.districtId }, transformer: selected, requestedKw, remainingAfterInstallationKw: feasibility.remainingAfterInstallationKw, balanceStatus: getBalanceStatus(selected), ksebDataTimestamp: recap.checkedAt, retrievedAt: recap.retrievedAt, source: { provider: 'KSEB', url: 'https://wss.kseb.in/selfservices/reCap' } })
   } catch (error) {
     const message = error instanceof Error && error.message === 'KSEB_MALFORMED_RESPONSE' ? 'KSEB returned an unexpected response. Please try again.' : 'KSEB capacity data is temporarily unavailable. Please try again.'
     return NextResponse.json({ success: false, state: 'KSEB_DATA_UNAVAILABLE', message }, { status: 503 })
