@@ -9,11 +9,19 @@ export async function POST(request: Request) {
     const body = await request.json() as { consumerNumber?: string; sectionId?: string; sectionOffice?: string; area?: string; requestedKw?: number; transformerName?: string }
     const requestedKw = Number(body.requestedKw)
     if (!Number.isFinite(requestedKw) || requestedKw <= 0) return NextResponse.json({ success: false, state: 'INVALID_REQUEST', message: 'Enter a valid requested solar capacity.' }, { status: 400 })
-    const decoded = body.consumerNumber?.trim() ? decodeKsebConsumerNumber(body.consumerNumber) : null
-    if (body.consumerNumber?.trim() && !decoded?.valid) return NextResponse.json({ success: false, state: decoded?.reason ?? 'INVALID_CONSUMER_NUMBER', message: decoded?.reason === 'INVALID_CONSUMER_NUMBER' ? 'Please enter a valid 13-digit KSEB Consumer Number.' : 'This consumer number could not be mapped to a verified KSEB section.' }, { status: 400 })
-    const section = await resolveKsebSection({ sectionId: body.sectionId, sectionOffice: body.sectionOffice || (decoded?.valid ? decoded.sectionName : undefined) })
-    if (!section) return NextResponse.json({ success: false, state: 'SECTION_NOT_IDENTIFIED', message: 'Unable to identify the KSEB section from the information provided.' }, { status: 422 })
-    if (decoded?.valid && body.sectionOffice && decoded.sectionName.toLocaleLowerCase() !== body.sectionOffice.trim().toLocaleLowerCase()) return NextResponse.json({ success: false, state: 'SECTION_CONFLICT', message: 'Consumer number and selected section appear to refer to different sections.' }, { status: 409 })
+    const consumerNumber = body.consumerNumber?.trim() ?? ''
+    const decoded = consumerNumber ? decodeKsebConsumerNumber(consumerNumber) : null
+    if (consumerNumber && decoded?.reason === 'INVALID_CONSUMER_NUMBER') return NextResponse.json({ success: false, state: 'INVALID_CONSUMER_NUMBER', message: 'Please enter a valid 13-digit KSEB Consumer Number.' }, { status: 400 })
+
+    // Consumer decoding is optional. An unresolved consumer mapping must never
+    // prevent a selected section office or explicit sectionId from initiating
+    // the authoritative KSEB DTR request.
+    const section = await resolveKsebSection({
+      sectionId: body.sectionId,
+      sectionOffice: body.sectionOffice || (decoded?.valid ? decoded.sectionName : undefined),
+    })
+    if (!section) return NextResponse.json({ success: false, state: 'SECTION_NOT_IDENTIFIED', message: 'Please select a KSEB Section Office or provide sufficient area information to identify the section.' }, { status: 422 })
+    if (decoded?.valid && body.sectionOffice && decoded.sectionName.toLocaleLowerCase() !== body.sectionOffice.trim().toLocaleLowerCase()) return NextResponse.json({ success: false, state: 'SECTION_CONFLICT', message: 'Consumer number and selected KSEB section appear to be different.' }, { status: 409 })
     const recap = await fetchKsebRecap({ sectionId: section.sectionId })
     const matched = matchTransformers(recap.records, body.area, body.transformerName)
     if (matched.status !== 'MATCH') return NextResponse.json({ success: false, state: matched.status === 'NO_MATCH' ? 'TRANSFORMER_NOT_IDENTIFIED' : 'MULTIPLE_TRANSFORMERS', message: matched.status === 'NO_MATCH' ? 'Transformer could not be identified from the supplied area.' : 'Please select the transformer serving your area.', matches: matched.matches.map((record) => ({ id: record.id, name: record.transformerName, feederName: record.feederName, balanceAvailableKw: record.balanceAvailableKw })) }, { status: 422 })
