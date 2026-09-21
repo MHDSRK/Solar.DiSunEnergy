@@ -1,9 +1,7 @@
 import { fetchKsebRecap } from '../recapClient'
 import type { RecapProvider } from './recapProvider'
 
-export const ksebRecapProvider: RecapProvider = {
-  getTransformerData: fetchKsebRecap,
-}
+export const ksebRecapProvider: RecapProvider = { getTransformerData: fetchKsebRecap }
 
 export function getRecapProvider(): RecapProvider {
   if (process.env.KSEB_PROVIDER === 'mock') {
