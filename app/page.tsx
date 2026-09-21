@@ -123,8 +123,9 @@ requestAnimationFrame(() => {
     setFeasibilityForm((current) => ({ ...current, sectionId, sectionOffice: section?.name ?? '', transformerId: '', transformerName: '' }))
     setFeasibilityResult(null)
     if (!sectionId) return
+    setKsebTransformers([])
     setIsCheckingFeasibility(true)
-    try { const response = await fetch('/api/kseb/transformer-feasibility', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sectionId, sectionOffice: section?.name, requestedKw: result?.kw ?? 1 }) }); const data = await response.json(); setKsebTransformers(data.transformers ?? []); setFeasibilityResult(null) } catch { setFeasibilityResult({ success: false, state: 'KSEB_DATA_UNAVAILABLE', message: 'KSEB capacity data is temporarily unavailable.' }) } finally { setIsCheckingFeasibility(false) }
+    try { const response = await fetch(`/api/kseb/transformers?sectionId=${encodeURIComponent(sectionId)}`); const data = await response.json(); setKsebTransformers(data.transformers ?? []) } catch { setKsebTransformers([]) } finally { setIsCheckingFeasibility(false) }
   }
 
   const submitFeasibility = async (event: FormEvent<HTMLFormElement>) => {
