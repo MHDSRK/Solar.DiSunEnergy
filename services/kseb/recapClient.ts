@@ -10,6 +10,16 @@ async function post(path: string, params?: Record<string, string>) {
   return response.json() as Promise<Record<string, unknown>>
 }
 
+export async function getKsebDistricts() {
+  const districts = await post('getDistricts')
+  return Object.entries(districts).map(([name, id]) => ({ id: String(id), name }))
+}
+
+export async function getKsebSections(districtId: string) {
+  const sections = await post('getinputSection', { distictid: districtId })
+  return Object.entries(sections).map(([name, id]) => ({ id: String(id), name }))
+}
+
 async function getSections() {
   const districts = await post('getDistricts')
   const output: Array<{ sectionId: string; name: string; districtId: string; districtName: string }> = []
