@@ -34,7 +34,6 @@ export function calculateFeasibility(balanceAvailableKw: number, requestedKw: nu
   return { status: (balanceAvailableKw >= requestedKw ? 'PRELIMINARILY_FEASIBLE' : 'INSUFFICIENT_CAPACITY') as FeasibilityStatus, available: balanceAvailableKw >= requestedKw, remainingAfterInstallationKw: balanceAvailableKw - requestedKw }
 }
 
-export function getBalanceStatus(record: TransformerRecord) {
-  const calculated = record.allowedCapacityKw - record.feasibilityIssuedKw - record.gridConnectedKw
-  return Math.abs(calculated - record.balanceAvailableKw) <= 0.01 ? 'MATCH' : 'DATA_DISCREPANCY'
+export function getBalanceStatus(_record: TransformerRecord) {
+  return 'KSEB_REPORTED' as const
 }
