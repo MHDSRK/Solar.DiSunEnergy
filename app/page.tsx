@@ -36,6 +36,17 @@ export default function Page() {
       sheet.scrollTo({ top: Math.max(0, result.offsetTop - 56), behavior: 'smooth' })
     })
   }, [result])
+
+  useEffect(() => {
+    if (!feasibilityResult) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const sheet = sheetRef.current
+        if (!sheet) return
+        sheet.scrollTo({ top: sheet.scrollHeight, behavior: 'smooth' })
+      })
+    })
+  }, [feasibilityResult])
   const keralaDistricts = ['Alappuzha', 'Ernakulam', 'Idukki', 'Kannur', 'Kasaragod', 'Kollam', 'Kottayam', 'Kozhikode', 'Malappuram', 'Palakkad', 'Pathanamthitta', 'Thiruvananthapuram', 'Thrissur', 'Wayanad']
 
   const validateField = (field: keyof typeof form, value: string) => {
@@ -325,10 +336,16 @@ requestAnimationFrame(() => {
             })()}
           </div>
 
-          <p className="mt-3 text-center text-[9px] leading-[1.25] text-slate-500">
-            <span className="block">This is a preliminary capacity check based on publicly retrieved KSEB transformer data. Final feasibility and approval remain</span>
-            <span className="block">subject to KSEB&apos;s official process.</span>
+          <p className="mt-4 px-2 text-left text-[12px] leading-[1.4] text-slate-500">
+            <span className="block">This is a preliminary capacity check based on publicly retrieved KSEB transformer data.</span>
+            <span className="block">Final feasibility and approval remain subject to KSEB&apos;s official process.</span>
           </p>
+          <button
+            type="button"
+            className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#1260a4] bg-white px-6 text-sm font-extrabold tracking-[0.08em] text-[#1260a4] shadow-none"
+          >
+            CHECK ELIGIBILITY <span aria-hidden="true" className="ml-2 text-lg leading-none">→</span>
+          </button>
         </>
       )}
     </div>
