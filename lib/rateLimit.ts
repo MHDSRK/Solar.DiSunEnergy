@@ -14,7 +14,7 @@ export async function checkRateLimit(
 ) {
   await ensureLeadTable()
   const key = clientKey(request, scope)
-  const rows = await getSql()\`
+  const rows = await getSql()`
     INSERT INTO api_rate_limits (rate_key, window_start, request_count)
     VALUES (
       ${key},
@@ -24,7 +24,7 @@ export async function checkRateLimit(
     ON CONFLICT (rate_key, window_start)
     DO UPDATE SET request_count = api_rate_limits.request_count + 1
     RETURNING request_count
-  \`
+  `
   const count = Number(rows[0]?.request_count ?? 1)
   return {
     limited: count > limit,
