@@ -7,11 +7,12 @@ export async function GET() {
     await requireAdmin()
     await ensureLeadTable()
     const sql = getSql()
-    const [leadRows, documentRows, siteVisitRows] = await sql.transaction([
+    const transactionResult = await sql.transaction([
       sql`SELECT * FROM leads ORDER BY created_at DESC`,
       sql`SELECT lead_id, document_type, file_name, mime_type, size_bytes, uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`,
       sql`SELECT lead_id, name, phone, preferred_date, preferred_time, location, status, created_at, updated_at FROM site_visits ORDER BY created_at DESC`,
     ])
+    const [leadRows, documentRows, siteVisitRows] = transactionResult as unknown as [Record<string, any>[], Record<string, any>[], Record<string, any>[]]
     const documentsByLead = new Map<string, any[]>()
     for (const document of documentRows) {
       const list = documentsByLead.get(String(document.lead_id)) ?? []
