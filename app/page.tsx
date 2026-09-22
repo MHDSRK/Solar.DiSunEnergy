@@ -336,7 +336,7 @@ requestAnimationFrame(() => {
             })()}
           </div>
 
-          <p className="mt-4 px-2 text-left text-[12px] leading-[1.4] text-slate-500">
+          <p className="mt-4 px-0 text-left text-[8px] leading-[1.25] tracking-[-0.01em] text-slate-500 whitespace-nowrap">
             <span className="block">This is a preliminary capacity check based on publicly retrieved KSEB transformer data.</span>
             <span className="block">Final feasibility and approval remain subject to KSEB&apos;s official process.</span>
           </p>
