@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     return new Response(bytes, {
       headers: {
         'Content-Type': row.mime_type,
-        'Content-Disposition': `inline; filename="${row.file_name.replace(/["\\r\\n]/g, '_')}"`,
+        'Content-Disposition': `inline; filename="${row.file_name.replaceAll('"', '_').replaceAll('\\r', '_').replaceAll('\\n', '_')}"`,
         'Cache-Control': 'private, no-store',
       },
     })
