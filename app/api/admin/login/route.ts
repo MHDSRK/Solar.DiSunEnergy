@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createSession, adminCookie } from '@/lib/adminAuth'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
 
 export async function POST(request: Request) {
   try {
+    const rate = await checkRateLimit(request, 'admin-login', 5, 900)
+    if (rate.limited) return rateLimitResponse(rate.retryAfter)
+
     const body = await request.json()
     const email = String(body.email ?? '').trim().toLowerCase()
     const password = String(body.password ?? '')
@@ -17,7 +21,8 @@ export async function POST(request: Request) {
     const response = NextResponse.json({ success: true })
     response.cookies.set(adminCookie.name, createSession(configuredEmail), adminCookie)
     return response
-  } catch {
+  } catch (error) {
+    console.error('Admin login failed', error)
     return NextResponse.json({ success: false, message: 'Invalid request.' }, { status: 400 })
   }
 }
