@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateBillFromUnits, calculateSolarResult, calculateSubsidy, getRecommendedKw } from '../services/solar/calculator'
+import { calculateBillFromUnits, calculateSolarResult, calculateSubsidy, getRecommendedKw } from '../services/solar/calculator.ts'
 
 test('solar recommendation regression values', () => {
   assert.equal(getRecommendedKw(2.5), 3)
