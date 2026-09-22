@@ -98,6 +98,8 @@ async function sheetsRequest<T>(config: ReturnType<typeof getConfig> extends inf
   return response.json() as Promise<T>
 }
 
+const SITE_VISIT_COLUMNS = ['Updated At', 'Lead ID', 'Name', 'Phone', 'Preferred Date', 'Preferred Time', 'Location', 'District', 'Locality', 'Area', 'Latitude', 'Longitude', 'Status']
+
 const LEAD_COLUMNS = [
   'Updated At', 'Lead ID', 'Name', 'Phone', 'District', 'Area', 'Bill (₹)',
   'Monthly KWH', 'Category', 'Recommended KW', 'Setup Cost', 'Subsidy',
@@ -182,6 +184,15 @@ export async function appendSiteVisitToGoogleSheet(siteVisit: LeadRecord) {
   const config = getConfig()
   if (!config) return { configured: false, saved: false }
 
+  const headerRange = `${encodeURIComponent(config.siteVisitSheet)}!A1:M1`
+  const header = await sheetsRequest<{ values?: string[][] }>(config, `/values/${headerRange}`)
+  if ((header.values?.[0]?.length ?? 0) < SITE_VISIT_COLUMNS.length) {
+    await sheetsRequest(config, `/values/${headerRange}?valueInputOption=RAW`, {
+      method: 'PUT',
+      body: JSON.stringify({ range: `${config.siteVisitSheet}!A1:M1`, majorDimension: 'ROWS', values: [SITE_VISIT_COLUMNS] }),
+    })
+  }
+
   const row = [
     new Date(String(siteVisit.updated_at || siteVisit.created_at || new Date().toISOString())).toISOString(),
     siteVisit.lead_id ?? '',
@@ -190,10 +201,15 @@ export async function appendSiteVisitToGoogleSheet(siteVisit: LeadRecord) {
     siteVisit.preferred_date ?? '',
     siteVisit.preferred_time ?? '',
     siteVisit.location ?? '',
+    siteVisit.district ?? '',
+    siteVisit.locality ?? '',
+    siteVisit.area ?? '',
+    siteVisit.latitude ?? '',
+    siteVisit.longitude ?? '',
     siteVisit.status ?? 'BOOKED',
   ]
 
-  await sheetsRequest(config, `/values/${encodeURIComponent(config.siteVisitSheet)}!A:H?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+  await sheetsRequest(config, `/values/${encodeURIComponent(config.siteVisitSheet)}!A:M?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
   })
