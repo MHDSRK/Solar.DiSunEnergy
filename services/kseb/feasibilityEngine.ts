@@ -22,12 +22,32 @@ export function parseKw(value: unknown): number | null {
 
 export function normalizeTransformer(value: Record<string, unknown>): TransformerRecord | null {
   const allowedCapacityKw = parseKw(value.allowed_cap)
-  const feasibilityIssuedKw = parseKw(value.feasible)
-  const gridConnectedKw = parseKw(value.regi)
-  const balanceAvailableKw = parseKw(value.comp_cap)
+  const gridConnectedKw = parseKw(value.comp_cap)
+  const balanceAvailableKw = parseKw(value.regi)
   const dtrCapacityKva = parseKw(value.capacity)
+
+  // KSEB's reCap payload field names do not line up with the visible table
+  // labels. The authoritative table relationship is:
+  // 90% DTR capacity = feasibility issued + grid connected + balance available.
+  // Derive feasibility issued from the other three displayed values so the
+  // website result matches KSEB's published table.
+  const feasibilityIssuedKw =
+    allowedCapacityKw !== null && gridConnectedKw !== null && balanceAvailableKw !== null
+      ? Math.max(0, allowedCapacityKw - gridConnectedKw - balanceAvailableKw)
+      : null
+
   if ([allowedCapacityKw, feasibilityIssuedKw, gridConnectedKw, balanceAvailableKw, dtrCapacityKva].some((item) => item === null)) return null
-  return { id: String(value.id ?? ''), transformerName: String(value.transformer_name ?? '').trim(), feederName: String(value.feeder_name ?? '').trim(), dtrCapacityKva: dtrCapacityKva!, allowedCapacityKw: allowedCapacityKw!, feasibilityIssuedKw: feasibilityIssuedKw!, gridConnectedKw: gridConnectedKw!, balanceAvailableKw: balanceAvailableKw! }
+
+  return {
+    id: String(value.id ?? ''),
+    transformerName: String(value.transformer_name ?? '').trim(),
+    feederName: String(value.feeder_name ?? '').trim(),
+    dtrCapacityKva: dtrCapacityKva!,
+    allowedCapacityKw: allowedCapacityKw!,
+    feasibilityIssuedKw: feasibilityIssuedKw!,
+    gridConnectedKw: gridConnectedKw!,
+    balanceAvailableKw: balanceAvailableKw!,
+  }
 }
 
 export function calculateFeasibility(balanceAvailableKw: number, requestedKw: number) {
