@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
+import { notifyLeadEvent } from '@/lib/notifications/leadNotifications'
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
@@ -51,6 +52,15 @@ export async function POST(request: Request) {
         file_data = EXCLUDED.file_data,
         uploaded_at = NOW()
     `
+
+    const countRows = await getSql()`SELECT COUNT(*)::int AS count FROM lead_documents WHERE lead_id = ${leadId}`
+    const documentCount = Number((countRows as unknown as Record<string, unknown>[])[0]?.count ?? 0)
+    if (documentCount >= ALLOWED_DOCUMENTS.size) {
+      const leadRows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
+      const lead = (leadRows as unknown as Record<string, unknown>[])[0]
+      if (lead) void notifyLeadEvent('documents', lead).catch((error) => console.error('Document notifications failed', error))
+    }
+
     return NextResponse.json({ success: true, documentType, fileName: file.name })
   } catch (error) {
     console.error('Eligibility document upload failed', error)
