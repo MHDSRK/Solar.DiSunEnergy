@@ -197,20 +197,23 @@ export default function Page() {
       window.setTimeout(() => {
         const calculated = calculateSolarResult()
         setIsCalculating(false)
-        void updateLead({
-          name: form.fullName,
-          phone: form.phone,
-          district: form.district,
-          area: form.area,
-          bill: calculationMode === 'bill' ? Number(form.bill) : null,
-          monthly_kwh: calculated.monthlyKwh,
-          connection_category: form.category,
-          recommended_kw: calculated.kw,
-          setup_cost: calculated.cost,
-          subsidy: calculated.subsidy,
-          financing_amount: calculated.loan,
-          customer_contribution: calculated.netCost,
-        })
+        void (async () => {
+          const saved = await updateLead({
+            name: form.fullName,
+            phone: form.phone,
+            district: form.district,
+            area: form.area,
+            bill: calculationMode === 'bill' ? Number(form.bill) : null,
+            monthly_kwh: calculated.monthlyKwh,
+            connection_category: form.category,
+            recommended_kw: calculated.kw,
+            setup_cost: calculated.cost,
+            subsidy: calculated.subsidy,
+            financing_amount: calculated.loan,
+            customer_contribution: calculated.netCost,
+          })
+          if (!saved) console.error('Calculator lead update did not complete.')
+        })()
 requestAnimationFrame(() => {
           const sheet = sheetRef.current
           const result = resultRef.current
@@ -306,7 +309,7 @@ requestAnimationFrame(() => {
       const feasibilityData = await response.json()
       setFeasibilityResult(feasibilityData)
       if (feasibilityData.success) {
-        void updateLead({
+        const saved = await updateLead({
           kseb_consumer_number: normalizedConsumerNumber,
           kseb_district: feasibilityForm.districtName,
           kseb_section: feasibilityForm.sectionOffice,
@@ -315,6 +318,7 @@ requestAnimationFrame(() => {
           requested_kw: feasibilityData.requestedKw,
           remaining_transformer_capacity: feasibilityData.remainingAfterInstallationKw,
         })
+        if (!saved) console.error('Feasibility lead update did not complete.')
       }
     } catch { setFeasibilityResult({ success: false, state: 'KSEB_DATA_UNAVAILABLE', message: 'KSEB transformer capacity data is temporarily unavailable.' }) }
     finally { setIsCheckingFeasibility(false) }
