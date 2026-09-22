@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ensureLeadTable, sql } from '@/lib/db'
+import { ensureLeadTable, getSql } from '@/lib/db'
 
 function makeLeadId() {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
@@ -10,7 +10,7 @@ export async function POST() {
   try {
     await ensureLeadTable()
     const leadId = makeLeadId()
-    await sql`INSERT INTO leads (lead_id) VALUES (${leadId})`
+    await getSql()`INSERT INTO leads (lead_id) VALUES (${leadId})`
     return NextResponse.json({ success: true, leadId })
   } catch (error) {
     console.error('Lead creation failed', error)
@@ -31,7 +31,7 @@ export async function PATCH(request: Request) {
     if (!entries.length) return NextResponse.json({ success: true })
     for (const [key, value] of entries) {
       if (!/^[a-z_]+$/.test(key)) continue
-      await sql.query(`UPDATE leads SET ${key} = $1, updated_at = NOW() WHERE lead_id = $2`, [value ?? null, leadId])
+      await getSql().query(`UPDATE leads SET ${key} = $1, updated_at = NOW() WHERE lead_id = $2`, [value ?? null, leadId])
     }
     return NextResponse.json({ success: true, leadId })
   } catch (error) {
