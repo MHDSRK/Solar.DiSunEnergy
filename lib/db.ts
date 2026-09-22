@@ -36,6 +36,10 @@ export async function ensureLeadTable() {
       feasibility_status TEXT,
       requested_kw NUMERIC,
       remaining_transformer_capacity NUMERIC,
+      kseb_allowed_capacity_kw NUMERIC,
+      kseb_feasibility_issued_kw NUMERIC,
+      kseb_grid_connected_kw NUMERIC,
+      kseb_checked_at TIMESTAMPTZ,
       lead_status TEXT NOT NULL DEFAULT 'NEW',
       privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
       privacy_consent_at TIMESTAMPTZ,
@@ -50,6 +54,10 @@ export async function ensureLeadTable() {
 
   await sql`
     ALTER TABLE leads
+      ADD COLUMN IF NOT EXISTS kseb_allowed_capacity_kw NUMERIC,
+      ADD COLUMN IF NOT EXISTS kseb_feasibility_issued_kw NUMERIC,
+      ADD COLUMN IF NOT EXISTS kseb_grid_connected_kw NUMERIC,
+      ADD COLUMN IF NOT EXISTS kseb_checked_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS lead_status TEXT NOT NULL DEFAULT 'NEW',
       ADD COLUMN IF NOT EXISTS privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS privacy_consent_at TIMESTAMPTZ,
