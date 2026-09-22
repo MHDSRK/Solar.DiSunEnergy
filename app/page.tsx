@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { calculateSolarResult } from '@/services/solar/calculator'
 
 // Saved design assets for the next page iteration.
 export const floorImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image-C3090BE5-0zzyFAsUgRwLxLDeh1A2N1YUSLqpBi.jpeg'
@@ -103,40 +104,7 @@ export default function Page() {
     setErrors((current) => ({ ...current, [field]: '' }))
   }
 
-  const calculateBillFromUnits = (units: number, category: string) => {
-    if (category === 'Commercial') return 60 + units * 9.5
-    const slabs = [[50, 3.35], [100, 4.25], [150, 5.35], [200, 7.2], [250, 8.5], [300, 6.75], [350, 7.6], [400, 7.95], [500, 8.25], [Infinity, 9.2]] as const
-    let total = 60
-    let previous = 0
-    for (const [limit, rate] of slabs) {
-      total += Math.max(0, Math.min(units, limit) - previous) * rate
-      previous = limit
-      if (units <= limit) break
-    }
-    return total
-  }
-
-  const getRecommendedKw = (rawKw: number) => rawKw <= 3 ? 3 : rawKw < 5 ? 5 : Math.ceil(rawKw)
-  const calculateSetupCost = (kw: number) => kw === 1 ? 85000 : kw === 2 ? 150000 : kw === 3 ? 220000 : kw === 5 ? 325000 : 220000 + (kw - 3) * 52500
-  const calculateSolarResult = () => {
-    const input = Number(form.bill)
-    const units = calculationMode === 'units' ? input : (() => {
-      const target = Math.max(0, input - 60)
-      if (form.category === 'Commercial') return target / 9.5
-      let low = 0, high = Math.max(1, target / 3.35)
-      while (calculateBillFromUnits(high, form.category) < input) high *= 2
-      for (let i = 0; i < 40; i += 1) { const middle = (low + high) / 2; if (calculateBillFromUnits(middle, form.category) < input) low = middle; else high = middle }
-      return (low + high) / 2
-    })()
-    const kw = getRecommendedKw(Number((units / 120).toFixed(2)))
-    const cost = calculateSetupCost(kw)
-    const subsidy = form.category === 'Domestic' ? kw <= 2 ? kw * 30000 : kw <= 3 ? 60000 + (kw - 2) * 18000 : 78000 : 0
-    const loan = 200000
-    const calculated = { kw, roofMin: kw * 80, roofMax: kw * 120, cost, subsidy, loan, netCost: Math.max(0, cost - subsidy - loan), monthlyKwh: Number(units.toFixed(2)) }
-    setResult(calculated)
-    return calculated
-  }
-
+  const calculateResult = () => calculateSolarResult(Number(form.bill), form.category, calculationMode)
   const createLead = async () => {
     try {
       const response = await fetch('/api/leads', { method: 'POST' })
@@ -196,7 +164,7 @@ export default function Page() {
       setIsCalculating(true)
       requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: sheetRef.current.scrollHeight, behavior: 'smooth' }))
       window.setTimeout(() => {
-        const calculated = calculateSolarResult()
+        const calculated = calculateResult()
         setIsCalculating(false)
         void (async () => {
           const saved = await updateLead({
