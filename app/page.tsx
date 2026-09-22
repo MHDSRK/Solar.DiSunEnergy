@@ -14,8 +14,10 @@ export default function Page() {
   const [ksebSections, setKsebSections] = useState<Array<{ id: string; name: string }>>([])
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [isLoadingSections, setIsLoadingSections] = useState(false)
+  const [isLoadingTransformers, setIsLoadingTransformers] = useState(false)
   const [ksebTransformers, setKsebTransformers] = useState<Array<{ id: string; transformerName: string; feederName: string; dtrCapacityKva: number; allowedCapacityKw: number; feasibilityIssuedKw: number; gridConnectedKw: number; balanceAvailableKw: number }>>([])
   const [feasibilityErrors, setFeasibilityErrors] = useState<Record<string, string>>({})
+  const [ksebLoadError, setKsebLoadError] = useState('')
   const [feasibilityResult, setFeasibilityResult] = useState<Record<string, unknown> | null>(null)
   const [isCheckingFeasibility, setIsCheckingFeasibility] = useState(false)
   const [calculationMode, setCalculationMode] = useState<'bill' | 'units'>('bill')
@@ -108,24 +110,65 @@ requestAnimationFrame(() => {
   const loadKsebDistricts = async () => {
     if (ksebDistricts.length) return
     setIsLoadingDistricts(true)
-    try { const response = await fetch('/api/kseb/districts'); const data = await response.json(); setKsebDistricts(data.districts ?? []) } finally { setIsLoadingDistricts(false) }
+    setKsebLoadError('')
+    try {
+      const response = await fetch('/api/kseb/districts')
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Unable to load KSEB districts.')
+      setKsebDistricts(data.districts ?? [])
+    } catch {
+      setKsebDistricts([])
+      setKsebLoadError('Unable to load KSEB district data. Please try again.')
+    } finally {
+      setIsLoadingDistricts(false)
+    }
   }
+
   const selectKsebDistrict = async (districtId: string) => {
     const district = ksebDistricts.find((item) => item.id === districtId)
     setFeasibilityForm((current) => ({ ...current, districtId, districtName: district?.name ?? '', sectionId: '', sectionOffice: '', transformerId: '', transformerName: '' }))
-    setKsebSections([]); setKsebTransformers([]); setFeasibilityResult(null)
+    setKsebSections([])
+    setKsebTransformers([])
+    setFeasibilityResult(null)
+    setKsebLoadError('')
     if (!districtId) return
+
     setIsLoadingSections(true)
-    try { const response = await fetch(`/api/kseb/sections?districtId=${encodeURIComponent(districtId)}`); const data = await response.json(); setKsebSections(data.sections ?? []) } finally { setIsLoadingSections(false) }
+    try {
+      const response = await fetch(`/api/kseb/sections?districtId=${encodeURIComponent(districtId)}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Unable to load KSEB sections.')
+      setKsebSections(data.sections ?? [])
+      if (!(data.sections ?? []).length) setKsebLoadError('No KSEB sections were found for the selected district.')
+    } catch {
+      setKsebSections([])
+      setKsebLoadError('Unable to load KSEB sections. Please try again.')
+    } finally {
+      setIsLoadingSections(false)
+    }
   }
+
   const selectKsebSection = async (sectionId: string) => {
     const section = ksebSections.find((item) => item.id === sectionId)
     setFeasibilityForm((current) => ({ ...current, sectionId, sectionOffice: section?.name ?? '', transformerId: '', transformerName: '' }))
     setFeasibilityResult(null)
-    if (!sectionId) return
     setKsebTransformers([])
-    setIsCheckingFeasibility(true)
-    try { const response = await fetch(`/api/kseb/transformers?sectionId=${encodeURIComponent(sectionId)}`); const data = await response.json(); setKsebTransformers(data.transformers ?? []) } catch { setKsebTransformers([]) } finally { setIsCheckingFeasibility(false) }
+    setKsebLoadError('')
+    if (!sectionId) return
+
+    setIsLoadingTransformers(true)
+    try {
+      const response = await fetch(`/api/kseb/transformers?sectionId=${encodeURIComponent(sectionId)}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Unable to load KSEB transformers.')
+      setKsebTransformers(data.transformers ?? [])
+      if (!(data.transformers ?? []).length) setKsebLoadError('No KSEB transformers were found for the selected section.')
+    } catch {
+      setKsebTransformers([])
+      setKsebLoadError('Unable to load KSEB transformer data. Please try again.')
+    } finally {
+      setIsLoadingTransformers(false)
+    }
   }
 
   const submitFeasibility = async (event: FormEvent<HTMLFormElement>) => {
@@ -137,6 +180,7 @@ requestAnimationFrame(() => {
     if (!normalizedConsumerNumber) nextErrors.consumerNumber = 'Consumer number is required.'
     else if (!/^\d{13}$/.test(normalizedConsumerNumber)) nextErrors.consumerNumber = 'Please enter a valid 13-digit KSEB Consumer Number.'
     if (!hasSection) nextErrors.lookup = 'Select a KSEB District and Section.'
+    if (!result?.kw) nextErrors.lookup = 'Complete the solar calculation before checking feasibility.'
     if (!feasibilityForm.transformerId) nextErrors.transformer = 'Select a transformer from the KSEB list.'
 
     setFeasibilityErrors(nextErrors)
@@ -181,7 +225,7 @@ requestAnimationFrame(() => {
             <div className="sticky top-0 z-40 -mx-4 flex h-12 shrink-0 isolate items-center justify-between bg-white px-4 pb-1 pt-0 shadow-[0_3px_8px_rgba(7,21,40,.08)] before:absolute before:-inset-x-1 before:-top-2 before:-z-10 before:h-12 before:bg-white before:content-['']"><span className="text-sm font-semibold text-[#071528]">{isFeasibilityPage ? '2 / 4' : '1 / 4'}</span><div className="flex items-center gap-1" aria-label={`Step ${isFeasibilityPage ? 2 : 1} of 4`}><span className="h-1 w-5 rounded-full bg-[#1260a4]" /><span className={`h-1 w-5 rounded-full ${isFeasibilityPage ? 'bg-[#1260a4]' : 'bg-slate-300'}`} /><span className="h-1 w-5 rounded-full bg-slate-300" /><span className="h-1 w-5 rounded-full bg-slate-300" /></div><button type="button" onClick={() => setIsCalculatorOpen(false)} aria-label="Close calculator" className="grid size-10 place-items-center text-3xl font-light">×</button></div>
             <h2 className={`${isFeasibilityPage ? 'hidden' : ''} relative z-0 mt-2 px-2 text-center text-2xl font-extrabold leading-[1.05] tracking-[-.04em]`}>SOLAR POWER<br />CALCULATOR</h2>
             <p className={isFeasibilityPage ? 'hidden' : 'mt-1 text-center text-[8.4px] font-bold tracking-[0.12em]'}>CALCULATION BASED ON</p>
-            <div className={isFeasibilityPage ? 'hidden' : 'mt-1 grid grid-cols-2 overflow-hidden rounded-t-xl border border-slate-300 text-[9px] font-bold leading-none'}><button type="button" onClick={() => setCalculationMode('bill')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'bill' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY BILL (₹)</button><button type="button" onClick={() => setCalculationMode('units')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'units' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY UNITS (KW)</button></div>
+            <div className={isFeasibilityPage ? 'hidden' : 'mt-1 grid grid-cols-2 overflow-hidden rounded-t-xl border border-slate-300 text-[9px] font-bold leading-none'}><button type="button" onClick={() => setCalculationMode('bill')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'bill' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY BILL (₹)</button><button type="button" onClick={() => setCalculationMode('units')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'units' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY UNITS (KWH)</button></div>
             <form onSubmit={validateAndSubmit} className={isFeasibilityPage ? 'hidden' : 'border-x border-b border-[#8bd35c] px-3 py-2'} noValidate>
               <div className="grid grid-cols-2 items-start gap-3">
                 <label className="block text-[10px] font-medium leading-tight">{calculationMode === 'bill' ? <>AVERAGE MONTHLY<br />ELECTRICITY BILL (₹)</> : <><span className="block whitespace-nowrap">AVERAGE MONTHLY</span><span className="block whitespace-nowrap">CONSUMPTION (KWH)</span></>}<span className="relative mt-1 block"><span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-medium">{calculationMode === 'bill' ? '₹' : 'KWH'}</span><input value={form.bill} onChange={(event) => updateField('bill', event.target.value.replace(/\D/g, ''))} className={`h-10 w-full rounded-lg border pl-9 pr-8 text-sm outline-none focus:border-[#159600] ${errors.bill ? 'border-red-500' : 'border-slate-400'}`} inputMode="numeric" aria-invalid={Boolean(errors.bill)} onBlur={(event) => validateField('bill', event.target.value)} /><span className="absolute right-1 top-1/2 flex -translate-y-1/2 flex-col"><button type="button" aria-label="Increase value" className="h-4 px-1 text-xs leading-none" onClick={() => updateField('bill', String(Number(form.bill || 0) + 100))}>▲</button><button type="button" aria-label="Decrease value" className="h-4 px-1 text-xs leading-none" onClick={() => updateField('bill', String(Math.max(0, Number(form.bill || 0) - 100)))}>▼</button></span></span>{errors.bill && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.bill}</span>}</label>
@@ -194,13 +238,14 @@ requestAnimationFrame(() => {
                 <div className="grid grid-cols-2 gap-3"><label className="block text-[10px] font-medium">DISTRICT<select value={form.district} data-placeholder={!form.district} onChange={(event) => updateField('district', event.target.value)} onBlur={(event) => validateField('district', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-[#159600] ${errors.district ? 'border-red-500' : 'border-slate-400'}`}><option value="" className="text-gray-400">Select district</option>{keralaDistricts.map((district) => <option key={district} value={district}>{district}</option>)}</select>{errors.district && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.district}</span>}</label><label className="block text-[10px] font-medium">AREA<input value={form.area} onChange={(event) => updateField('area', event.target.value)} onBlur={(event) => validateField('area', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.area ? 'border-red-500' : 'border-slate-400'}`} />{errors.area && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.area}</span>}</label></div>
                 <button type="submit" className="mt-3 flex min-h-10 w-full items-center justify-center rounded-full bg-[#1260a4] px-6 text-sm font-extrabold tracking-[0.08em] text-white shadow-none">SUBMIT</button>
                 {isCalculating && <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-50 px-3 py-4 text-xs font-semibold text-slate-500"><span className="size-3 animate-spin rounded-full border-2 border-[#159600]/25 border-t-[#159600]" />Preparing your solar estimate...</div>}
-                {result && <div ref={resultRef} className="mt-0 space-y-2 animate-in fade-in duration-500"><h3 className="-mt-1 text-center text-base font-extrabold leading-tight">Solar Estimate &amp; Financial Summary</h3><div className="rounded-2xl border-2 border-slate-200 bg-white p-3 text-center"><div className="border-b border-slate-200 pb-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Recommended plant</p><p className="mt-1 text-3xl font-extrabold text-[#168566]">{result.kw} <span className="text-lg">kW</span></p></div><div className="pt-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Approx. roof area</p><p className="mt-1 text-xl font-extrabold text-[#293244]">{result.roofMin}–{result.roofMax} sq ft</p></div></div><div className="rounded-2xl border-2 border-slate-200 bg-white p-2.5 text-[10px]"><div className="flex justify-between gap-2"><span>Estimated Total Setup Cost:</span><strong>₹ {result.cost.toLocaleString('en-IN')}</strong></div><div className="mt-1.5 flex justify-between gap-2 text-[#168566]"><span>- PM Surya Ghar Govt Subsidy:<small className="block text-slate-400">(Central Govt Grant)</small></span><strong>-₹ {result.subsidy.toLocaleString('en-IN')}</strong></div><div className="mt-1.5 flex justify-between gap-2 text-[#168566]"><span>- Maximum Bank Loan:<small className="block text-slate-400">(Up to)</small></span><strong>-₹ {result.loan.toLocaleString('en-IN')}</strong></div><div className="mt-2 flex justify-between gap-2 text-sm font-extrabold"><span>Est. Out-of-Pocket Cost:</span><strong className="text-[#168566]">₹ {result.netCost.toLocaleString('en-IN')}</strong></div></div><div className="flex items-center justify-between rounded-2xl border-2 border-slate-200 bg-white p-3 text-sm font-extrabold text-[#168566]"><span>Est. Annual Savings:</span><strong>₹ {(result.kw * 6800).toLocaleString('en-IN')}</strong></div><button type="button" onClick={() => setIsFeasibilityPage(true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-2 border-[#1260a4] bg-white px-6 text-sm font-extrabold tracking-[0.08em] text-[#1260a4] shadow-none">CHECK FEASIBILITY <span aria-hidden="true" className="text-lg leading-none">â†’</span></button></div>}
+                {result && <div ref={resultRef} className="mt-0 space-y-2 animate-in fade-in duration-500"><h3 className="-mt-1 text-center text-base font-extrabold leading-tight">Solar Estimate &amp; Financial Summary</h3><div className="rounded-2xl border-2 border-slate-200 bg-white p-3 text-center"><div className="border-b border-slate-200 pb-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Recommended plant</p><p className="mt-1 text-3xl font-extrabold text-[#168566]">{result.kw} <span className="text-lg">kW</span></p></div><div className="pt-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Approx. roof area</p><p className="mt-1 text-xl font-extrabold text-[#293244]">{result.roofMin}–{result.roofMax} sq ft</p></div></div><div className="rounded-2xl border-2 border-slate-200 bg-white p-2.5 text-[10px]"><div className="flex justify-between gap-2"><span>Estimated Total Setup Cost:</span><strong>₹ {result.cost.toLocaleString('en-IN')}</strong></div><div className="mt-1.5 flex justify-between gap-2 text-[#168566]"><span>- PM Surya Ghar Govt Subsidy:<small className="block text-slate-400">(Central Govt Grant)</small></span><strong>-₹ {result.subsidy.toLocaleString('en-IN')}</strong></div><div className="mt-1.5 flex justify-between gap-2 text-[#168566]"><span>- Maximum Bank Loan:<small className="block text-slate-400">(Up to)</small></span><strong>-₹ {result.loan.toLocaleString('en-IN')}</strong></div><div className="mt-2 flex justify-between gap-2 text-sm font-extrabold"><span>Est. Out-of-Pocket Cost:</span><strong className="text-[#168566]">₹ {result.netCost.toLocaleString('en-IN')}</strong></div></div><div className="flex items-center justify-between rounded-2xl border-2 border-slate-200 bg-white p-3 text-sm font-extrabold text-[#168566]"><span>Est. Annual Savings:</span><strong>₹ {(result.kw * 6800).toLocaleString('en-IN')}</strong></div><button type="button" onClick={() => setIsFeasibilityPage(true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-2 border-[#1260a4] bg-white px-6 text-sm font-extrabold tracking-[0.08em] text-[#1260a4] shadow-none">CHECK FEASIBILITY <span aria-hidden="true" className="text-lg leading-none">→</span></button></div>}
               </div></div>
             </form>
             {isFeasibilityPage && (
   <form onSubmit={submitFeasibility} className="px-2 pb-2 pt-2 text-center">
     <h2 className="text-xl font-extrabold leading-tight tracking-[-.04em]">CHECK TRANSFORMER<br />FEASIBILITY</h2>
     {feasibilityErrors.lookup && <p className="mb-3 text-left text-[9px] font-normal text-red-600">{feasibilityErrors.lookup}</p>}
+    {ksebLoadError && <p className="mb-3 text-left text-[9px] font-normal text-red-600">{ksebLoadError}</p>}
     <div className="mt-2 space-y-2 text-left">
       <label className="block text-[10px] font-medium">
         KSEB CONSUMER NUMBER
@@ -219,7 +264,7 @@ requestAnimationFrame(() => {
 
         <label className="block text-[10px] font-medium">
           SECTION OFFICE
-          <select value={feasibilityForm.sectionId} onFocus={loadKsebSections} onChange={(event) => selectKsebSection(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-slate-400 bg-white px-2 text-sm outline-none focus:border-[#159600]">
+          <select value={feasibilityForm.sectionId} onChange={(event) => selectKsebSection(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-slate-400 bg-white px-2 text-sm outline-none focus:border-[#159600]">
             <option value="">{isLoadingSections ? 'Loading sections...' : 'Select Section'}</option>
             {ksebSections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>
@@ -228,7 +273,7 @@ requestAnimationFrame(() => {
         <label className="block text-[10px] font-medium">
           TRANSFORMER
           <select value={feasibilityForm.transformerId} onChange={(event) => { const selected = ksebTransformers.find((transformer) => transformer.id === event.target.value); setFeasibilityForm((current) => ({ ...current, transformerId: event.target.value, transformerName: selected?.transformerName ?? '' })); setFeasibilityResult(null); }} className="mt-1 h-9 w-full rounded-lg border border-slate-400 bg-white px-2 text-sm outline-none focus:border-[#159600]">
-            <option value="">{isCheckingFeasibility ? 'Loading transformers...' : 'Select Transformer'}</option>
+            <option value="">{isLoadingTransformers ? 'Loading transformers...' : 'Select Transformer'}</option>
             {ksebTransformers.map((transformer) => <option key={transformer.id} value={transformer.id}>{transformer.transformerName}</option>)}
           </select>
         </label>
