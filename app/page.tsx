@@ -344,19 +344,47 @@ requestAnimationFrame(() => {
     )
   }
 
-  const submitEligibility = (event: FormEvent<HTMLFormElement>) => {
+  const submitEligibility = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextErrors: Record<string, string> = {}
     if (!eligibilityFiles.aadhaar) nextErrors.aadhaar = 'Upload Aadhaar Card.'
     if (!eligibilityFiles.pan) nextErrors.pan = 'Upload PAN Card.'
     if (!eligibilityFiles.bill) nextErrors.bill = 'Upload Latest KSEB Bill.'
     if (!eligibilityFiles.passbook) nextErrors.passbook = 'Upload Bank Passbook.'
+    for (const [key, file] of Object.entries(eligibilityFiles)) {
+      if (file && file.size > 4 * 1024 * 1024) nextErrors[key] = 'Maximum file size is 4 MB.'
+    }
     setEligibilityErrors(nextErrors)
+    setEligibilitySubmitError('')
     if (Object.keys(nextErrors).length) return
-    setEligibilitySubmitted(true)
+    if (!leadId || !leadToken) {
+      setEligibilitySubmitError('Your lead session has expired. Please start a new calculation.')
+      return
+    }
+
+    setEligibilitySubmitting(true)
+    try {
+      for (const [documentType, file] of Object.entries(eligibilityFiles)) {
+        if (!file) continue
+        const body = new FormData()
+        body.append('leadId', leadId)
+        body.append('leadToken', leadToken)
+        body.append('documentType', documentType)
+        body.append('file', file)
+        const response = await fetch('/api/leads/documents', { method: 'POST', body })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.message || 'Unable to save one of the documents.')
+      }
+      setEligibilitySubmitted(true)
+    } catch (error) {
+      setEligibilitySubmitted(false)
+      setEligibilitySubmitError(error instanceof Error ? error.message : 'Unable to submit the documents. Please try again.')
+    } finally {
+      setEligibilitySubmitting(false)
+    }
   }
 
-  const submitSiteVisit = (event: FormEvent<HTMLFormElement>) => {
+  const submitSiteVisit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextErrors: Record<string, string> = {}
     if (!siteVisit.name.trim()) nextErrors.name = 'Enter your name.'
@@ -365,7 +393,27 @@ requestAnimationFrame(() => {
     if (!siteVisit.time) nextErrors.time = 'Select a preferred time.'
     if (!siteVisit.location.trim()) nextErrors.location = 'Enter or capture your exact location.'
     setSiteVisitErrors(nextErrors)
-    if (!Object.keys(nextErrors).length) setLocationMessage('Site visit request received. Our executive will contact you soon.')
+    setSiteVisitMessage('')
+    if (Object.keys(nextErrors).length || !leadId || !leadToken) {
+      if (!leadId || !leadToken) setSiteVisitMessage('Your lead session has expired. Please start a new calculation.')
+      return
+    }
+
+    setSiteVisitSubmitting(true)
+    try {
+      const response = await fetch('/api/leads/site-visit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ leadId, leadToken, ...siteVisit }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to book the site visit.')
+      setSiteVisitMessage(data.message || 'Site visit request received. Our executive will contact you soon.')
+    } catch (error) {
+      setSiteVisitMessage(error instanceof Error ? error.message : 'Unable to book the site visit. Please try again.')
+    } finally {
+      setSiteVisitSubmitting(false)
+    }
   }
 
   return (
