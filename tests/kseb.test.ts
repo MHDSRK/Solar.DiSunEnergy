@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateFeasibility, normalizeTransformer, parseKw } from '../services/kseb/feasibilityEngine'
+import { calculateFeasibility, normalizeTransformer, parseKw } from '../services/kseb/feasibilityEngine.ts'
 
 test('KSEB reCap values map to the published balance formula', () => {
   const record = normalizeTransformer({
