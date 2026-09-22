@@ -8,6 +8,7 @@ export const markImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.co
 
 export default function Page() {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false)
+  const [leadId, setLeadId] = useState<string | null>(null)
   const [isFeasibilityPage, setIsFeasibilityPage] = useState(false)
   const [isEligibilityPage, setIsEligibilityPage] = useState(false)
   const [eligibilityFiles, setEligibilityFiles] = useState({ aadhaar: null as File | null, pan: null as File | null, bill: null as File | null, passbook: null as File | null })
@@ -34,7 +35,7 @@ export default function Page() {
   const [isCalculating, setIsCalculating] = useState(false)
   const sheetRef = useRef<HTMLElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
-  const [result, setResult] = useState<{ kw: number; roofMin: number; roofMax: number; cost: number; subsidy: number; loan: number; netCost: number } | null>(null)
+  const [result, setResult] = useState<{ kw: number; roofMin: number; roofMax: number; cost: number; subsidy: number; loan: number; netCost: number; monthlyKwh: number } | null>(null)
   useEffect(() => {
     if (!result) return
     requestAnimationFrame(() => {
@@ -124,7 +125,35 @@ export default function Page() {
     const cost = calculateSetupCost(kw)
     const subsidy = form.category === 'Domestic' ? kw <= 2 ? kw * 30000 : kw <= 3 ? 60000 + (kw - 2) * 18000 : 78000 : 0
     const loan = 200000
-    setResult({ kw, roofMin: kw * 80, roofMax: kw * 120, cost, subsidy, loan, netCost: Math.max(0, cost - subsidy - loan) })
+    const calculated = { kw, roofMin: kw * 80, roofMax: kw * 120, cost, subsidy, loan, netCost: Math.max(0, cost - subsidy - loan), monthlyKwh: Number(units.toFixed(2)) }
+    setResult(calculated)
+    return calculated
+  }
+
+  const createLead = async () => {
+    try {
+      const response = await fetch('/api/leads', { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok || !data.leadId) throw new Error(data.message || 'Unable to create lead.')
+      setLeadId(data.leadId)
+      return true
+    } catch {
+      setLeadId(null)
+      return false
+    }
+  }
+
+  const updateLead = async (updates: Record<string, unknown>) => {
+    if (!leadId) return
+    try {
+      await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ leadId, ...updates }),
+      })
+    } catch (error) {
+      console.error('Lead update failed', error)
+    }
   }
 
   const validateAndSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -142,8 +171,22 @@ export default function Page() {
       setIsCalculating(true)
       requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: sheetRef.current.scrollHeight, behavior: 'smooth' }))
       window.setTimeout(() => {
-        calculateSolarResult()
+        const calculated = calculateSolarResult()
         setIsCalculating(false)
+        void updateLead({
+          name: form.fullName,
+          phone: form.phone,
+          district: form.district,
+          area: form.area,
+          bill: calculationMode === 'bill' ? Number(form.bill) : null,
+          monthly_kwh: calculated.monthlyKwh,
+          connection_category: form.category,
+          recommended_kw: calculated.kw,
+          setup_cost: calculated.cost,
+          subsidy: calculated.subsidy,
+          financing_amount: calculated.loan,
+          customer_contribution: calculated.netCost,
+        })
 requestAnimationFrame(() => {
           const sheet = sheetRef.current
           const result = resultRef.current
@@ -236,7 +279,19 @@ requestAnimationFrame(() => {
     setFeasibilityResult(null)
     try {
       const response = await fetch('/api/kseb/transformer-feasibility', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consumerNumber: normalizedConsumerNumber, district: feasibilityForm.districtName, sectionId: feasibilityForm.sectionId, sectionOffice: feasibilityForm.sectionOffice, transformerId: feasibilityForm.transformerId, transformerName: feasibilityForm.transformerName, requestedKw: result?.kw }) })
-      setFeasibilityResult(await response.json())
+      const feasibilityData = await response.json()
+      setFeasibilityResult(feasibilityData)
+      if (feasibilityData.success) {
+        void updateLead({
+          kseb_consumer_number: normalizedConsumerNumber,
+          kseb_district: feasibilityForm.districtName,
+          kseb_section: feasibilityForm.sectionOffice,
+          transformer: feasibilityForm.transformerName,
+          feasibility_status: feasibilityData.status,
+          requested_kw: feasibilityData.requestedKw,
+          remaining_transformer_capacity: feasibilityData.remainingAfterInstallationKw,
+        })
+      }
     } catch { setFeasibilityResult({ success: false, state: 'KSEB_DATA_UNAVAILABLE', message: 'KSEB transformer capacity data is temporarily unavailable.' }) }
     finally { setIsCheckingFeasibility(false) }
   }
@@ -307,7 +362,7 @@ requestAnimationFrame(() => {
           <strong>Powerful future with SOLAR</strong>
         </p>
         <dl className="mx-auto mt-6 grid w-full max-w-[370px] grid-cols-3 divide-x divide-white/35"><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 78000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">PM SURYA GHAR<br />SUBSIDY</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 200000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">BANK LOAN<br />AVAILABLE</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Panels with<br /><span className="text-xl sm:text-2xl">30 YEARS</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">WARRANTY<br />ASSURANCE</dt></div></dl>
-        <div className="mt-auto pt-6"><p className="mb-3 text-center text-[14px] font-medium leading-[1.15] tracking-[0.01em] sm:text-lg">How much Power required<br /><span className="text-[20px] font-extrabold sm:text-2xl">for your home?</span></p><button type="button" onClick={() => setIsCalculatorOpen(true)} className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03]">CALCULATE NOW <span className="ml-2 text-[#2e8dbe]">&gt;</span></button><p className="mt-5 text-xs text-white/90">By continuing, you agree to our <a className="underline" href="/privacy-policy">Privacy policy</a> and <a className="underline" href="/terms-of-service">Terms&amp;Conditions</a></p></div>
+        <div className="mt-auto pt-6"><p className="mb-3 text-center text-[14px] font-medium leading-[1.15] tracking-[0.01em] sm:text-lg">How much Power required<br /><span className="text-[20px] font-extrabold sm:text-2xl">for your home?</span></p><button type="button" onClick={async () => { const created = await createLead(); if (created) { setIsCalculatorOpen(true); setIsFeasibilityPage(false); setIsEligibilityPage(false); setResult(null); setFeasibilityResult(null); requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0 })) } }} className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03]">CALCULATE NOW <span className="ml-2 text-[#2e8dbe]">&gt;</span></button><p className="mt-5 text-xs text-white/90">By continuing, you agree to our <a className="underline" href="/privacy-policy">Privacy policy</a> and <a className="underline" href="/terms-of-service">Terms&amp;Conditions</a></p></div>
       </section>
       {isCalculatorOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#03132f]/95 pt-[78px]" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
