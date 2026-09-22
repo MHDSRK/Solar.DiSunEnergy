@@ -446,7 +446,7 @@ requestAnimationFrame(() => {
                     ] as const).map(([key, label]) => (
                       <label key={key} className="block cursor-pointer text-left text-[10px] font-medium">
                         <span className="block mb-1">{label} <span className="text-red-500">*</span></span>
-                        <span className={`flex min-h-24 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed ${eligibilityErrors[key] ? 'border-red-500' : 'border-slate-300'} bg-slate-50 px-2 text-center`}>
+                        <span className={`flex min-h-14 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed ${eligibilityErrors[key] ? 'border-red-500' : 'border-slate-300'} bg-slate-50 px-2 text-center`}>
                           <span className="text-xl text-[#1260a4]">↑</span>
                           <span className="mt-1 text-[9px] text-slate-500">{eligibilityFiles[key] ? eligibilityFiles[key]!.name : 'Tap to upload'}</span>
                         </span>
@@ -460,12 +460,12 @@ requestAnimationFrame(() => {
                 </form>
 
                 {eligibilitySubmitted && (
-                  <>
-                    <div className="mt-4 rounded-xl border border-[#8bd35c] bg-[#f5fff0] px-3 py-3 text-center text-[11px] font-semibold text-[#1260a4]">
-                      Application received. Our executive will contact you soon.
-                    </div>
+                  <div className="mt-4 rounded-xl border border-[#8bd35c] bg-[#f5fff0] px-3 py-3 text-center text-[11px] font-semibold text-[#1260a4]">
+                    Application received. Our executive will contact you soon.
+                  </div>
+                )}
 
-                    <section className="mt-6 rounded-2xl border-2 border-[#1260a4] bg-white p-4 text-left shadow-[0_6px_18px_rgba(18,96,164,.12)]">
+                <section className="mt-6 rounded-2xl border-2 border-[#1260a4] bg-white p-4 text-left shadow-[0_6px_18px_rgba(18,96,164,.12)]">
                       <h3 className="text-center text-xl font-extrabold leading-tight text-[#071528]">READY TO GO SOLAR?</h3>
                       <p className="mt-1 text-center text-sm font-bold text-[#1260a4]">Book your free site visit</p>
 
@@ -480,7 +480,7 @@ requestAnimationFrame(() => {
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block text-[10px] font-medium">PREFERRED DATE
-                            <input type="date" value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                            <input type="date" min={new Date().toISOString().split('T')[0]} value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
                             {siteVisitErrors.date && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.date}</span>}
                           </label>
                           <label className="block text-[10px] font-medium">PREFERRED TIME
@@ -496,9 +496,7 @@ requestAnimationFrame(() => {
                         </label>
                         <button type="submit" className="mt-2 flex min-h-12 w-full items-center justify-center rounded-full bg-[#1260a4] px-6 text-sm font-extrabold tracking-[0.08em] text-white">BOOK NOW</button>
                       </form>
-                    </section>
-                  </>
-                )}
+                </section>
               </div>
             )}
           </section>
