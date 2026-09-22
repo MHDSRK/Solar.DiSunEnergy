@@ -167,7 +167,7 @@ export async function syncLeadToGoogleSheet(lead: LeadRecord) {
   if (existingRow) {
     await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:Z${existingRow}?valueInputOption=USER_ENTERED`, {
       method: 'PUT',
-      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:U${existingRow}`, majorDimension: 'ROWS', values: [row] }),
+      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:Z${existingRow}`, majorDimension: 'ROWS', values: [row] }),
     })
   } else {
     await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:Z?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
