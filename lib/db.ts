@@ -35,8 +35,30 @@ export async function ensureLeadTable() {
       transformer TEXT,
       feasibility_status TEXT,
       requested_kw NUMERIC,
-      remaining_transformer_capacity NUMERIC
+      remaining_transformer_capacity NUMERIC,
+      lead_status TEXT NOT NULL DEFAULT 'NEW',
+      privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
+      privacy_consent_at TIMESTAMPTZ,
+      terms_version TEXT,
+      calculated_at TIMESTAMPTZ,
+      feasibility_checked_at TIMESTAMPTZ,
+      documents_completed_at TIMESTAMPTZ,
+      site_visit_booked_at TIMESTAMPTZ,
+      converted_at TIMESTAMPTZ
     )
+  `
+
+  await sql`
+    ALTER TABLE leads
+      ADD COLUMN IF NOT EXISTS lead_status TEXT NOT NULL DEFAULT 'NEW',
+      ADD COLUMN IF NOT EXISTS privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS privacy_consent_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS terms_version TEXT,
+      ADD COLUMN IF NOT EXISTS calculated_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS feasibility_checked_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS documents_completed_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS site_visit_booked_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ
   `
 
   await sql`
@@ -60,10 +82,81 @@ export async function ensureLeadTable() {
       preferred_date DATE NOT NULL,
       preferred_time TIME NOT NULL,
       location TEXT NOT NULL,
+      district TEXT,
+      locality TEXT,
+      area TEXT,
+      latitude DOUBLE PRECISION,
+      longitude DOUBLE PRECISION,
       status TEXT NOT NULL DEFAULT 'BOOKED',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `
+
+  await sql`
+    ALTER TABLE site_visits
+      ADD COLUMN IF NOT EXISTS district TEXT,
+      ADD COLUMN IF NOT EXISTS locality TEXT,
+      ADD COLUMN IF NOT EXISTS area TEXT,
+      ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION
+  `
+
+  await sql`
+    DELETE FROM site_visits a USING site_visits b
+    WHERE a.ctid < b.ctid
+      AND a.phone = b.phone
+      AND a.preferred_date = b.preferred_date
+      AND a.preferred_time = b.preferred_time
+  `
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS site_visits_slot_unique
+    ON site_visits (phone, preferred_date, preferred_time)
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_events (
+      event_key TEXT PRIMARY KEY,
+      lead_id TEXT NOT NULL REFERENCES leads(lead_id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      payload JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS notification_events (
+      event_key TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      status TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (event_key, channel)
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS admin_audit_logs (
+      id BIGSERIAL PRIMARY KEY,
+      action TEXT NOT NULL,
+      lead_id TEXT,
+      details JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS leads_status_idx ON leads (lead_status)
+  `
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS leads_updated_idx ON leads (updated_at DESC)
+  `
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS lead_events_lead_idx ON lead_events (lead_id, created_at DESC)
   `
 
   await sql`
