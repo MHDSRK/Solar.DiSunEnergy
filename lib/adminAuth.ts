@@ -23,7 +23,7 @@ export function verifySession(value?: string) {
   const parts = value.split('.')
   if (parts.length !== 3) return false
   const [email, timestamp, signature] = parts
-  if (!email || !/^\\d+$/.test(timestamp)) return false
+  if (!email || !/^\d+$/.test(timestamp)) return false
   const age = Date.now() - Number(timestamp)
   if (age < 0 || age > MAX_AGE * 1000) return false
   const expected = sign(`${email}.${timestamp}`)
