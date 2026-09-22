@@ -9,6 +9,14 @@ export const markImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.co
 export default function Page() {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false)
   const [isFeasibilityPage, setIsFeasibilityPage] = useState(false)
+  const [isEligibilityPage, setIsEligibilityPage] = useState(false)
+  const [eligibilityFiles, setEligibilityFiles] = useState({ aadhaar: null as File | null, pan: null as File | null, bill: null as File | null, passbook: null as File | null })
+  const [eligibilityErrors, setEligibilityErrors] = useState<Record<string, string>>({})
+  const [eligibilitySubmitted, setEligibilitySubmitted] = useState(false)
+  const [siteVisit, setSiteVisit] = useState({ name: '', phone: '', date: '', time: '', location: '' })
+  const [siteVisitErrors, setSiteVisitErrors] = useState<Record<string, string>>({})
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationMessage, setLocationMessage] = useState('')
   const [feasibilityForm, setFeasibilityForm] = useState({ consumerNumber: '', districtId: '', districtName: '', sectionId: '', sectionOffice: '', transformerId: '', transformerName: '' })
   const [ksebDistricts, setKsebDistricts] = useState<Array<{ id: string; name: string }>>([])
   const [ksebSections, setKsebSections] = useState<Array<{ id: string; name: string }>>([])
@@ -36,6 +44,34 @@ export default function Page() {
       sheet.scrollTo({ top: Math.max(0, result.offsetTop - 56), behavior: 'smooth' })
     })
   }, [result])
+
+  useEffect(() => {
+    if (!eligibilitySubmitted) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const sheet = sheetRef.current
+        if (!sheet) return
+        sheet.scrollTo({ top: sheet.scrollHeight, behavior: 'smooth' })
+      })
+    })
+  }, [eligibilitySubmitted])
+
+  useEffect(() => {
+    if (!isEligibilityPage || siteVisit.location) return
+    setLocationLoading(true)
+    setLocationMessage('')
+    navigator.geolocation?.getCurrentPosition(
+      (position) => {
+        setSiteVisit((current) => ({ ...current, location: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}` }))
+        setLocationLoading(false)
+      },
+      () => {
+        setLocationLoading(false)
+        setLocationMessage('Location access is not available. You can enable it below or enter the location manually.')
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+    )
+  }, [isEligibilityPage])
 
   useEffect(() => {
     if (!feasibilityResult) return
@@ -205,6 +241,50 @@ requestAnimationFrame(() => {
     finally { setIsCheckingFeasibility(false) }
   }
 
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage('Location access is not supported by this browser. Please enter the location manually.')
+      return
+    }
+    setLocationLoading(true)
+    setLocationMessage('')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setSiteVisit((current) => ({ ...current, location: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}` }))
+        setLocationLoading(false)
+      },
+      () => {
+        setLocationLoading(false)
+        setLocationMessage('Please enable location access in your browser settings, then try again.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  }
+
+  const submitEligibility = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextErrors: Record<string, string> = {}
+    if (!eligibilityFiles.aadhaar) nextErrors.aadhaar = 'Upload Aadhaar Card.'
+    if (!eligibilityFiles.pan) nextErrors.pan = 'Upload PAN Card.'
+    if (!eligibilityFiles.bill) nextErrors.bill = 'Upload Latest KSEB Bill.'
+    if (!eligibilityFiles.passbook) nextErrors.passbook = 'Upload Bank Passbook.'
+    setEligibilityErrors(nextErrors)
+    if (Object.keys(nextErrors).length) return
+    setEligibilitySubmitted(true)
+  }
+
+  const submitSiteVisit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextErrors: Record<string, string> = {}
+    if (!siteVisit.name.trim()) nextErrors.name = 'Enter your name.'
+    if (!/^[6-9]\d{9}$/.test(siteVisit.phone)) nextErrors.phone = 'Enter a valid 10-digit phone number.'
+    if (!siteVisit.date) nextErrors.date = 'Select a preferred date.'
+    if (!siteVisit.time) nextErrors.time = 'Select a preferred time.'
+    if (!siteVisit.location.trim()) nextErrors.location = 'Enter or capture your exact location.'
+    setSiteVisitErrors(nextErrors)
+    if (!Object.keys(nextErrors).length) setLocationMessage('Site visit request received. Our executive will contact you soon.')
+  }
+
   return (
     <main className="relative min-h-dvh overflow-y-auto bg-[#03132f] text-white" aria-label="DiSun Energy International solar calculator">
       <div className="fixed inset-0 bg-[#03132f] bg-cover bg-center bg-fixed bg-no-repeat" style={{ backgroundImage: `url(${floorImage})` }} aria-hidden="true" />
@@ -233,11 +313,11 @@ requestAnimationFrame(() => {
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#03132f]/95 pt-[78px]" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
           <button type="button" aria-label="Close calculator" className="absolute inset-0 cursor-default" onClick={() => setIsCalculatorOpen(false)} />
           <section ref={sheetRef} className="relative isolate h-[calc(100dvh-94px)] w-[calc(100%-24px)] overflow-x-hidden overflow-y-auto rounded-[28px] bg-white px-4 pb-3 pt-2 text-[#071528] shadow-[0_12px_32px_rgba(0,0,0,.28)] animate-in slide-in-from-bottom duration-300">
-            <div className="sticky top-0 z-40 -mx-4 flex h-12 shrink-0 isolate items-center justify-between bg-white px-4 pb-1 pt-0 shadow-[0_3px_8px_rgba(7,21,40,.08)] before:absolute before:-inset-x-1 before:-top-2 before:-z-10 before:h-12 before:bg-white before:content-['']"><button type="button" onClick={() => { if (isFeasibilityPage) setIsFeasibilityPage(false); else setIsCalculatorOpen(false) }} aria-label={isFeasibilityPage ? "Back to solar calculation" : "Close calculator"} className="grid size-10 place-items-center text-3xl font-light">←</button><div className="flex items-center gap-1" aria-hidden="true"><span className="h-1 w-5 rounded-full bg-[#1260a4]" /><span className={`h-1 w-5 rounded-full ${isFeasibilityPage ? 'bg-[#1260a4]' : 'bg-slate-300'}`} /><span className="h-1 w-5 rounded-full bg-slate-300" /><span className="h-1 w-5 rounded-full bg-slate-300" /></div><button type="button" onClick={() => setIsCalculatorOpen(false)} aria-label="Close calculator" className="grid size-10 place-items-center text-3xl font-light">×</button></div>
+            <div className="sticky top-0 z-40 -mx-4 flex h-12 shrink-0 isolate items-center justify-between bg-white px-4 pb-1 pt-0 shadow-[0_3px_8px_rgba(7,21,40,.08)] before:absolute before:-inset-x-1 before:-top-2 before:-z-10 before:h-12 before:bg-white before:content-['']"><button type="button" onClick={() => { if (isEligibilityPage) setIsEligibilityPage(false); else if (isFeasibilityPage) setIsFeasibilityPage(false); else setIsCalculatorOpen(false) }} aria-label={isEligibilityPage ? "Back to transformer feasibility" : isFeasibilityPage ? "Back to solar calculation" : "Close calculator"} className="grid size-10 place-items-center text-3xl font-light">←</button><div className="flex items-center justify-center gap-1" aria-hidden="true"><span className="h-1 w-5 rounded-full bg-[#1260a4]" /><span className={`h-1 w-5 rounded-full ${isFeasibilityPage || isEligibilityPage ? 'bg-[#1260a4]' : 'bg-slate-300'}`} /><span className={`h-1 w-5 rounded-full ${isEligibilityPage ? 'bg-[#1260a4]' : 'bg-slate-300'}`} /></div><button type="button" onClick={() => setIsCalculatorOpen(false)} aria-label="Close calculator" className="grid size-10 place-items-center text-3xl font-light">×</button></div>
             <h2 className={`${isFeasibilityPage ? 'hidden' : ''} relative z-0 mt-2 px-2 text-center text-2xl font-extrabold leading-[1.05] tracking-[-.04em]`}>SOLAR POWER<br />CALCULATOR</h2>
             <p className={isFeasibilityPage ? 'hidden' : 'mt-1 text-center text-[8.4px] font-bold tracking-[0.12em]'}>CALCULATION BASED ON</p>
             <div className={isFeasibilityPage ? 'hidden' : 'mt-1 grid grid-cols-2 overflow-hidden rounded-t-xl border border-slate-300 text-[9px] font-bold leading-none'}><button type="button" onClick={() => setCalculationMode('bill')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'bill' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY BILL (₹)</button><button type="button" onClick={() => setCalculationMode('units')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'units' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY UNITS (KWH)</button></div>
-            <form onSubmit={validateAndSubmit} className={isFeasibilityPage ? 'hidden' : 'border-x border-b border-[#8bd35c] px-3 py-2'} noValidate>
+            <form onSubmit={validateAndSubmit} className={isFeasibilityPage || isEligibilityPage ? 'hidden' : 'border-x border-b border-[#8bd35c] px-3 py-2'} noValidate>
               <div className="grid grid-cols-2 items-start gap-3">
                 <label className="block text-[10px] font-medium leading-tight">{calculationMode === 'bill' ? <>AVERAGE MONTHLY<br />ELECTRICITY BILL (₹)</> : <><span className="block whitespace-nowrap">AVERAGE MONTHLY</span><span className="block whitespace-nowrap">CONSUMPTION (KWH)</span></>}<span className="relative mt-1 block"><span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-medium">{calculationMode === 'bill' ? '₹' : 'KWH'}</span><input value={form.bill} onChange={(event) => updateField('bill', event.target.value.replace(/\D/g, ''))} className={`h-10 w-full rounded-lg border pl-9 pr-8 text-sm outline-none focus:border-[#159600] ${errors.bill ? 'border-red-500' : 'border-slate-400'}`} inputMode="numeric" aria-invalid={Boolean(errors.bill)} onBlur={(event) => validateField('bill', event.target.value)} /><span className="absolute right-1 top-1/2 flex -translate-y-1/2 flex-col"><button type="button" aria-label="Increase value" className="h-4 px-1 text-xs leading-none" onClick={() => updateField('bill', String(Number(form.bill || 0) + 100))}>▲</button><button type="button" aria-label="Decrease value" className="h-4 px-1 text-xs leading-none" onClick={() => updateField('bill', String(Math.max(0, Number(form.bill || 0) - 100)))}>▼</button></span></span>{errors.bill && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.bill}</span>}</label>
                 <label className="block text-[10px] font-medium leading-tight">CONNECTION<br />CATEGORY<select value={form.category} data-placeholder={!form.category} onChange={(event) => updateField('category', event.target.value)} onBlur={(event) => validateField('category', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-[#159600] ${errors.category ? 'border-red-500' : 'border-slate-400'}`}><option value="" className="text-gray-400">Select</option><option value="Domestic">Domestic</option><option value="Commercial">Commercial</option></select>{errors.category && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.category}</span>}</label>
@@ -252,7 +332,7 @@ requestAnimationFrame(() => {
                 {result && <div ref={resultRef} className="mt-0 space-y-2 animate-in fade-in duration-500"><div className="rounded-2xl border-2 border-slate-200 bg-white p-3 text-center"><div className="border-b border-slate-200 pb-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Recommended plant</p><p className="mt-1 text-3xl font-extrabold text-[#168566]">{result.kw} <span className="text-lg">kW</span></p></div><div className="pt-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Approx. roof area</p><p className="mt-1 text-xl font-extrabold text-[#293244]">{result.roofMin}–{result.roofMax} sq ft</p></div></div><div className="rounded-2xl border-2 border-slate-200 bg-white p-2.5 text-[10px]"><div className="flex justify-between gap-2"><span>Estimated Total Setup Cost:</span><strong>₹ {result.cost.toLocaleString('en-IN')}</strong></div><div className="mt-1.5 flex justify-between gap-2 text-[#168566]"><span>- PM Surya Ghar Govt Subsidy:<small className="block text-slate-400">(Central Govt Grant)</small></span><strong>-₹ {result.subsidy.toLocaleString('en-IN')}</strong></div><div className="mt-1.5 flex justify-between gap-2 text-[#168566]"><span>- Maximum Bank Loan:<small className="block text-slate-400">(Up to)</small></span><strong>-₹ {result.loan.toLocaleString('en-IN')}</strong></div></div><div className="rounded-2xl border-2 border-[#9cc8ff] bg-white p-3"><div className="flex items-center justify-between gap-2 text-sm font-extrabold"><span>Est. Out-of-Pocket Cost:</span><strong className="text-base text-[#168566]">₹ {result.netCost.toLocaleString('en-IN')}</strong></div></div><button type="button" onClick={() => setIsFeasibilityPage(true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-2 border-[#1260a4] bg-white px-6 text-sm font-extrabold tracking-[0.08em] text-[#1260a4] shadow-none">CHECK FEASIBILITY <span aria-hidden="true" className="text-lg leading-none">→</span></button></div>}
               </div></div>
             </form>
-            {isFeasibilityPage && (
+            {isFeasibilityPage && !isEligibilityPage && (
   <form onSubmit={submitFeasibility} className="px-2 pb-2 pt-2 text-center">
     <h2 className="text-xl font-extrabold leading-tight tracking-[-.04em]">CHECK TRANSFORMER<br />FEASIBILITY</h2>
     {feasibilityErrors.lookup && <p className="mb-3 text-left text-[9px] font-normal text-red-600">{feasibilityErrors.lookup}</p>}
@@ -341,6 +421,7 @@ requestAnimationFrame(() => {
           </div>
           <button
             type="button"
+            onClick={() => { setIsEligibilityPage(true); setEligibilitySubmitted(false); requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0, behavior: 'smooth' })) }}
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#1260a4] bg-white px-6 text-sm font-extrabold tracking-[0.08em] text-[#1260a4] shadow-none"
           >
             CHECK ELIGIBILITY <span aria-hidden="true" className="ml-2 text-lg leading-none">→</span>
@@ -350,6 +431,76 @@ requestAnimationFrame(() => {
     </div>
   </form>
 )}
+            {isEligibilityPage && (
+              <div className="px-2 pb-6 pt-2">
+                <h2 className="text-xl font-extrabold leading-tight tracking-[-.04em] text-center">CHECK LOAN &amp; SUBSIDY ELIGIBILITY</h2>
+                <p className="mt-1 text-center text-[10px] font-medium text-slate-500">Provide your documents to calculate loan &amp; Subsidy eligibility</p>
+
+                <form onSubmit={submitEligibility} className="mt-4 space-y-3" noValidate>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      ['aadhaar', 'Aadhaar Card'],
+                      ['pan', 'PAN Card'],
+                      ['bill', 'Latest KSEB Bill'],
+                      ['passbook', 'Bank Passbook'],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="block cursor-pointer text-left text-[10px] font-medium">
+                        <span className="block mb-1">{label} <span className="text-red-500">*</span></span>
+                        <span className={`flex min-h-24 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed ${eligibilityErrors[key] ? 'border-red-500' : 'border-slate-300'} bg-slate-50 px-2 text-center`}>
+                          <span className="text-xl text-[#1260a4]">↑</span>
+                          <span className="mt-1 text-[9px] text-slate-500">{eligibilityFiles[key] ? eligibilityFiles[key]!.name : 'Tap to upload'}</span>
+                        </span>
+                        <input type="file" accept=".pdf,image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0] ?? null; setEligibilityFiles((current) => ({ ...current, [key]: file })); setEligibilityErrors((current) => ({ ...current, [key]: '' })); }} />
+                        {eligibilityErrors[key] && <span className="mt-1 block text-[8px] text-red-600">{eligibilityErrors[key]}</span>}
+                      </label>
+                    ))}
+                  </div>
+
+                  <button type="submit" className="mt-2 flex min-h-11 w-full items-center justify-center rounded-full bg-[#1260a4] px-6 text-sm font-extrabold tracking-[0.08em] text-white">SUBMIT</button>
+                </form>
+
+                {eligibilitySubmitted && (
+                  <>
+                    <div className="mt-4 rounded-xl border border-[#8bd35c] bg-[#f5fff0] px-3 py-3 text-center text-[11px] font-semibold text-[#1260a4]">
+                      Application received. Our executive will contact you soon.
+                    </div>
+
+                    <section className="mt-6 rounded-2xl border-2 border-[#1260a4] bg-white p-4 text-left shadow-[0_6px_18px_rgba(18,96,164,.12)]">
+                      <h3 className="text-center text-xl font-extrabold leading-tight text-[#071528]">READY TO GO SOLAR?</h3>
+                      <p className="mt-1 text-center text-sm font-bold text-[#1260a4]">Book your free site visit</p>
+
+                      <form onSubmit={submitSiteVisit} className="mt-4 space-y-3" noValidate>
+                        <label className="block text-[10px] font-medium">NAME
+                          <input value={siteVisit.name} onChange={(event) => { setSiteVisit((current) => ({ ...current, name: event.target.value })); setSiteVisitErrors((current) => ({ ...current, name: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.name ? 'border-red-500' : 'border-slate-400'} px-2 text-sm outline-none focus:border-[#159600]`} />
+                          {siteVisitErrors.name && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.name}</span>}
+                        </label>
+                        <label className="block text-[10px] font-medium">PHONE NUMBER
+                          <input value={siteVisit.phone} onChange={(event) => { setSiteVisit((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })); setSiteVisitErrors((current) => ({ ...current, phone: '' })) }} inputMode="numeric" maxLength={10} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.phone ? 'border-red-500' : 'border-slate-400'} px-2 text-sm outline-none focus:border-[#159600]`} />
+                          {siteVisitErrors.phone && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.phone}</span>}
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block text-[10px] font-medium">PREFERRED DATE
+                            <input type="date" value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                            {siteVisitErrors.date && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.date}</span>}
+                          </label>
+                          <label className="block text-[10px] font-medium">PREFERRED TIME
+                            <input type="time" value={siteVisit.time} onChange={(event) => { setSiteVisit((current) => ({ ...current, time: event.target.value })); setSiteVisitErrors((current) => ({ ...current, time: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.time ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                            {siteVisitErrors.time && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.time}</span>}
+                          </label>
+                        </div>
+                        <label className="block text-[10px] font-medium">EXACT LOCATION
+                          <textarea value={siteVisit.location} onChange={(event) => { setSiteVisit((current) => ({ ...current, location: event.target.value })); setSiteVisitErrors((current) => ({ ...current, location: '' })) }} rows={2} placeholder={locationLoading ? 'Fetching exact location...' : 'Enter exact location'} className={`mt-1 w-full resize-none rounded-lg border ${siteVisitErrors.location ? 'border-red-500' : 'border-slate-400'} px-2 py-2 text-sm outline-none focus:border-[#159600]`} />
+                          <button type="button" onClick={requestLocation} className="mt-1 text-[9px] font-bold text-[#1260a4] underline">{locationLoading ? 'Fetching location...' : 'Use my current location'}</button>
+                          {locationMessage && <span className="mt-1 block text-[8px] text-slate-500">{locationMessage}</span>}
+                          {siteVisitErrors.location && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.location}</span>}
+                        </label>
+                        <button type="submit" className="mt-2 flex min-h-12 w-full items-center justify-center rounded-full bg-[#1260a4] px-6 text-sm font-extrabold tracking-[0.08em] text-white">BOOK NOW</button>
+                      </form>
+                    </section>
+                  </>
+                )}
+              </div>
+            )}
           </section>
         </div>
       )}
