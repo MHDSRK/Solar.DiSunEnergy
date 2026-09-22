@@ -60,7 +60,8 @@ export async function PATCH(request: Request) {
       `UPDATE leads SET ${setParts.join(', ')}, updated_at = NOW() WHERE lead_id = $${values.length} RETURNING lead_id`,
       values,
     )
-    if (!result.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
+    const updatedRows = result as unknown as Record<string, any>[]
+    if (!updatedRows.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
     return NextResponse.json({ success: true, leadId })
   } catch (error) {
     console.error('Lead update failed', error)
