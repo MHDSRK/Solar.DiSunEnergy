@@ -9,15 +9,21 @@ export const markImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.co
 export default function Page() {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false)
   const [leadId, setLeadId] = useState<string | null>(null)
+  const [leadToken, setLeadToken] = useState<string | null>(null)
+  const [leadSaveError, setLeadSaveError] = useState('')
   const [isFeasibilityPage, setIsFeasibilityPage] = useState(false)
   const [isEligibilityPage, setIsEligibilityPage] = useState(false)
   const [eligibilityFiles, setEligibilityFiles] = useState({ aadhaar: null as File | null, pan: null as File | null, bill: null as File | null, passbook: null as File | null })
   const [eligibilityErrors, setEligibilityErrors] = useState<Record<string, string>>({})
   const [eligibilitySubmitted, setEligibilitySubmitted] = useState(false)
+  const [eligibilitySubmitting, setEligibilitySubmitting] = useState(false)
+  const [eligibilitySubmitError, setEligibilitySubmitError] = useState('')
   const [siteVisit, setSiteVisit] = useState({ name: '', phone: '', date: '', time: '', location: '' })
   const [siteVisitErrors, setSiteVisitErrors] = useState<Record<string, string>>({})
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationMessage, setLocationMessage] = useState('')
+  const [siteVisitMessage, setSiteVisitMessage] = useState('')
+  const [siteVisitSubmitting, setSiteVisitSubmitting] = useState(false)
   const [feasibilityForm, setFeasibilityForm] = useState({ consumerNumber: '', districtId: '', districtName: '', sectionId: '', sectionOffice: '', transformerId: '', transformerName: '' })
   const [ksebDistricts, setKsebDistricts] = useState<Array<{ id: string; name: string }>>([])
   const [ksebSections, setKsebSections] = useState<Array<{ id: string; name: string }>>([])
@@ -134,26 +140,44 @@ export default function Page() {
     try {
       const response = await fetch('/api/leads', { method: 'POST' })
       const data = await response.json()
-      if (!response.ok || !data.leadId) throw new Error(data.message || 'Unable to create lead.')
+      if (!response.ok || !data.leadId || !data.leadToken) throw new Error(data.message || 'Unable to create lead.')
       setLeadId(data.leadId)
+      setLeadToken(data.leadToken)
+      setLeadSaveError('')
       return true
-    } catch {
+    } catch (error) {
+      console.error('Lead creation failed', error)
       setLeadId(null)
+      setLeadToken(null)
       return false
     }
   }
 
   const updateLead = async (updates: Record<string, unknown>) => {
-    if (!leadId) return
-    try {
-      await fetch('/api/leads', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ leadId, ...updates }),
-      })
-    } catch (error) {
-      console.error('Lead update failed', error)
+    if (!leadId || !leadToken) return false
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await fetch('/api/leads', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ leadId, leadToken, ...updates }),
+        })
+        if (response.ok) {
+          setLeadSaveError('')
+          return true
+        }
+        const data = await response.json().catch(() => ({}))
+        if (response.status === 401 || response.status === 404) {
+          setLeadSaveError(data.message || 'Lead authorization expired. Please start a new calculation.')
+          return false
+        }
+      } catch (error) {
+        if (attempt === 2) console.error('Lead update failed', error)
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 350))
     }
+    setLeadSaveError('We could not save your latest details. Please try again.')
+    return false
   }
 
   const validateAndSubmit = (event: FormEvent<HTMLFormElement>) => {
