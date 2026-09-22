@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHmac } from 'node:crypto'
 import { createLeadToken, verifyLeadToken } from '../lib/leadAuth.ts'
 
 test('lead token is bound to its lead ID', () => {
