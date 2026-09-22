@@ -23,7 +23,7 @@ export function verifyLeadToken(leadId: string, token?: string) {
   const parts = token.split('.')
   if (parts.length !== 3) return false
   const [tokenLeadId, timestamp, signature] = parts
-  if (tokenLeadId !== leadId || !/^\\d+$/.test(timestamp)) return false
+  if (tokenLeadId !== leadId || !/^\d+$/.test(timestamp)) return false
   const age = Date.now() - Number(timestamp)
   if (age < 0 || age > MAX_AGE_MS) return false
   const expected = sign(`${tokenLeadId}.${timestamp}`)
