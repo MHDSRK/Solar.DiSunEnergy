@@ -2,10 +2,16 @@ import { NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { createLeadToken, verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
+import { notifyLeadEvent } from '@/lib/notifications/leadNotifications'
 
 function makeLeadId() {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   return `DSN-${date}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+}
+
+async function getLead(leadId: string) {
+  const rows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
+  return (rows as unknown as Record<string, unknown>[])[0] ?? null
 }
 
 export async function POST(request: Request) {
@@ -13,8 +19,15 @@ export async function POST(request: Request) {
     const rate = await checkRateLimit(request, 'lead-create', 20, 60)
     if (rate.limited) return rateLimitResponse(rate.retryAfter)
 
+    await ensureLeadTable()
     const leadId = makeLeadId()
     await getSql()`INSERT INTO leads (lead_id) VALUES (${leadId})`
+
+    const lead = await getLead(leadId)
+    if (lead) {
+      void notifyLeadEvent('created', lead).catch((error) => console.error('Lead creation notifications failed', error))
+    }
+
     return NextResponse.json({ success: true, leadId, leadToken: createLeadToken(leadId) })
   } catch (error) {
     console.error('Lead creation failed', error)
@@ -62,6 +75,15 @@ export async function PATCH(request: Request) {
     )
     const updatedRows = result as unknown as Record<string, any>[]
     if (!updatedRows.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
+
+    const lead = await getLead(leadId)
+    if (lead) {
+      const event = entries.some(([key]) => key.startsWith('kseb_') || key === 'transformer' || key === 'feasibility_status' || key === 'requested_kw' || key === 'remaining_transformer_capacity')
+        ? 'feasibility'
+        : 'calculator'
+      void notifyLeadEvent(event, lead).catch((error) => console.error(`Lead ${event} notifications failed`, error))
+    }
+
     return NextResponse.json({ success: true, leadId })
   } catch (error) {
     console.error('Lead update failed', error)
