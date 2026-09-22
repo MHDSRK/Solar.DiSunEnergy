@@ -8,6 +8,16 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
 const ALLOWED_DOCUMENTS = new Set(['aadhaar', 'pan', 'bill', 'passbook'])
 
+async function hasValidFileSignature(file: File) {
+  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer())
+  const starts = (values: number[]) => values.every((value, index) => bytes[index] === value)
+  if (file.type === 'application/pdf') return starts([0x25, 0x50, 0x44, 0x46])
+  if (file.type === 'image/jpeg') return starts([0xff, 0xd8, 0xff])
+  if (file.type === 'image/png') return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  if (file.type === 'image/webp') return starts([0x52, 0x49, 0x46, 0x46]) && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  return false
+}
+
 export async function POST(request: Request) {
   try {
     const rate = await checkRateLimit(request, 'lead-document', 20, 60)
@@ -34,6 +44,9 @@ export async function POST(request: Request) {
     if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ success: false, message: 'Each document must be between 1 byte and 4 MB.' }, { status: 400 })
     }
+    if (!(await hasValidFileSignature(file))) {
+      return NextResponse.json({ success: false, message: 'The uploaded file does not match its declared file type.' }, { status: 400 })
+    }
 
     await ensureLeadTable()
     const exists = await getSql()`SELECT lead_id FROM leads WHERE lead_id = ${leadId} LIMIT 1`
@@ -56,6 +69,7 @@ export async function POST(request: Request) {
     const countRows = await getSql()`SELECT COUNT(*)::int AS count FROM lead_documents WHERE lead_id = ${leadId}`
     const documentCount = Number((countRows as unknown as Record<string, unknown>[])[0]?.count ?? 0)
     if (documentCount >= ALLOWED_DOCUMENTS.size) {
+      await getSql()`UPDATE leads SET documents_completed_at = COALESCE(documents_completed_at, NOW()), lead_status = CASE WHEN lead_status NOT IN ('CONVERTED','CANCELLED','SITE_VISIT_BOOKED') THEN 'DOCUMENTS_RECEIVED' ELSE lead_status END, updated_at = NOW() WHERE lead_id = ${leadId}`
       const leadRows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
       const lead = (leadRows as unknown as Record<string, unknown>[])[0]
       if (lead) void notifyLeadEvent('documents', lead).catch((error) => console.error('Document notifications failed', error))

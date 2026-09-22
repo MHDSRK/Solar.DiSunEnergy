@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { calculateSolarResult } from '@/services/solar/calculator'
 
 // Saved design assets for the next page iteration.
 export const floorImage = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image-C3090BE5-0zzyFAsUgRwLxLDeh1A2N1YUSLqpBi.jpeg'
@@ -36,6 +37,7 @@ export default function Page() {
   const [feasibilityResult, setFeasibilityResult] = useState<Record<string, unknown> | null>(null)
   const [isCheckingFeasibility, setIsCheckingFeasibility] = useState(false)
   const [calculationMode, setCalculationMode] = useState<'bill' | 'units'>('bill')
+  const [privacyConsent, setPrivacyConsent] = useState(false)
   const [form, setForm] = useState({ bill: '', category: '', fullName: '', phone: '', district: '', area: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isCalculating, setIsCalculating] = useState(false)
@@ -102,40 +104,7 @@ export default function Page() {
     setErrors((current) => ({ ...current, [field]: '' }))
   }
 
-  const calculateBillFromUnits = (units: number, category: string) => {
-    if (category === 'Commercial') return 60 + units * 9.5
-    const slabs = [[50, 3.35], [100, 4.25], [150, 5.35], [200, 7.2], [250, 8.5], [300, 6.75], [350, 7.6], [400, 7.95], [500, 8.25], [Infinity, 9.2]] as const
-    let total = 60
-    let previous = 0
-    for (const [limit, rate] of slabs) {
-      total += Math.max(0, Math.min(units, limit) - previous) * rate
-      previous = limit
-      if (units <= limit) break
-    }
-    return total
-  }
-
-  const getRecommendedKw = (rawKw: number) => rawKw <= 3 ? 3 : rawKw < 5 ? 5 : Math.ceil(rawKw)
-  const calculateSetupCost = (kw: number) => kw === 1 ? 85000 : kw === 2 ? 150000 : kw === 3 ? 220000 : kw === 5 ? 325000 : 220000 + (kw - 3) * 52500
-  const calculateSolarResult = () => {
-    const input = Number(form.bill)
-    const units = calculationMode === 'units' ? input : (() => {
-      const target = Math.max(0, input - 60)
-      if (form.category === 'Commercial') return target / 9.5
-      let low = 0, high = Math.max(1, target / 3.35)
-      while (calculateBillFromUnits(high, form.category) < input) high *= 2
-      for (let i = 0; i < 40; i += 1) { const middle = (low + high) / 2; if (calculateBillFromUnits(middle, form.category) < input) low = middle; else high = middle }
-      return (low + high) / 2
-    })()
-    const kw = getRecommendedKw(Number((units / 120).toFixed(2)))
-    const cost = calculateSetupCost(kw)
-    const subsidy = form.category === 'Domestic' ? kw <= 2 ? kw * 30000 : kw <= 3 ? 60000 + (kw - 2) * 18000 : 78000 : 0
-    const loan = 200000
-    const calculated = { kw, roofMin: kw * 80, roofMax: kw * 120, cost, subsidy, loan, netCost: Math.max(0, cost - subsidy - loan), monthlyKwh: Number(units.toFixed(2)) }
-    setResult(calculated)
-    return calculated
-  }
-
+  const calculateResult = () => calculateSolarResult(Number(form.bill), form.category, calculationMode)
   const createLead = async () => {
     try {
       const response = await fetch('/api/leads', { method: 'POST' })
@@ -195,7 +164,7 @@ export default function Page() {
       setIsCalculating(true)
       requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: sheetRef.current.scrollHeight, behavior: 'smooth' }))
       window.setTimeout(() => {
-        const calculated = calculateSolarResult()
+        const calculated = calculateResult()
         setIsCalculating(false)
         void (async () => {
           const saved = await updateLead({
@@ -211,6 +180,7 @@ export default function Page() {
             subsidy: calculated.subsidy,
             financing_amount: calculated.loan,
             customer_contribution: calculated.netCost,
+            privacy_consent: privacyConsent,
           })
           if (!saved) console.error('Calculator lead update did not complete.')
         })()
@@ -305,7 +275,7 @@ requestAnimationFrame(() => {
     setIsCheckingFeasibility(true)
     setFeasibilityResult(null)
     try {
-      const response = await fetch('/api/kseb/transformer-feasibility', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consumerNumber: normalizedConsumerNumber, district: feasibilityForm.districtName, sectionId: feasibilityForm.sectionId, sectionOffice: feasibilityForm.sectionOffice, transformerId: feasibilityForm.transformerId, transformerName: feasibilityForm.transformerName, requestedKw: result?.kw }) })
+      const response = await fetch('/api/kseb/transformer-feasibility', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consumerNumber: normalizedConsumerNumber, districtId: feasibilityForm.districtId, district: feasibilityForm.districtName, sectionId: feasibilityForm.sectionId, sectionOffice: feasibilityForm.sectionOffice, transformerId: feasibilityForm.transformerId, transformerName: feasibilityForm.transformerName, requestedKw: result?.kw }) })
       const feasibilityData = await response.json()
       setFeasibilityResult(feasibilityData)
       if (feasibilityData.success) {
@@ -317,6 +287,10 @@ requestAnimationFrame(() => {
           feasibility_status: feasibilityData.status,
           requested_kw: feasibilityData.requestedKw,
           remaining_transformer_capacity: feasibilityData.remainingAfterInstallationKw,
+          kseb_allowed_capacity_kw: feasibilityData.transformer?.allowedCapacityKw,
+          kseb_feasibility_issued_kw: feasibilityData.transformer?.feasibilityIssuedKw,
+          kseb_grid_connected_kw: feasibilityData.transformer?.gridConnectedKw,
+          kseb_checked_at: feasibilityData.retrievedAt,
         })
         if (!saved) console.error('Feasibility lead update did not complete.')
       }
@@ -458,6 +432,7 @@ requestAnimationFrame(() => {
                 <label className="block text-[10px] font-medium">FULL NAME<input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} onBlur={(event) => validateField('fullName', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.fullName ? 'border-red-500' : 'border-slate-400'}`} />{errors.fullName && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.fullName}</span>}</label>
                 <label className="block text-[10px] font-medium">PHONE NUMBER<input value={form.phone} onChange={(event) => updateField('phone', event.target.value.replace(/\D/g, '').slice(0, 10))} onBlur={(event) => validateField('phone', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.phone ? 'border-red-500' : 'border-slate-400'}`} inputMode="numeric" maxLength={10} />{errors.phone && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.phone}</span>}</label>
                 <div className="grid grid-cols-2 gap-3"><label className="block text-[10px] font-medium">DISTRICT<select value={form.district} data-placeholder={!form.district} onChange={(event) => updateField('district', event.target.value)} onBlur={(event) => validateField('district', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-[#159600] ${errors.district ? 'border-red-500' : 'border-slate-400'}`}><option value="" className="text-gray-400">Select district</option>{keralaDistricts.map((district) => <option key={district} value={district}>{district}</option>)}</select>{errors.district && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.district}</span>}</label><label className="block text-[10px] font-medium">AREA<input value={form.area} onChange={(event) => updateField('area', event.target.value)} onBlur={(event) => validateField('area', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.area ? 'border-red-500' : 'border-slate-400'}`} />{errors.area && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.area}</span>}</label></div>
+                <label className="mt-3 flex items-start gap-2 text-[9px] leading-[1.25] text-slate-600"><input type="checkbox" checked={privacyConsent} onChange={(event) => { setPrivacyConsent(event.target.checked); setErrors((current) => ({ ...current, consent: '' })) }} className="mt-0.5 size-3 accent-[#1260a4]" /> <span>I agree to the <a href="/privacy-policy" target="_blank" rel="noreferrer" className="font-semibold underline">Privacy Policy</a> and <a href="/terms-of-service" target="_blank" rel="noreferrer" className="font-semibold underline">Terms & Conditions</a>.</span></label>{errors.consent && <span className="mt-1 block text-[9px] text-red-600">{errors.consent}</span>}
                 <button type="submit" className="mt-3 flex min-h-10 w-full items-center justify-center rounded-full bg-[#1260a4] px-6 text-sm font-extrabold tracking-[0.08em] text-white shadow-none">SUBMIT</button>
                 {isCalculating && <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-50 px-3 py-4 text-xs font-semibold text-slate-500"><span className="size-3 animate-spin rounded-full border-2 border-[#159600]/25 border-t-[#159600]" />Preparing your solar estimate...</div>}
                 {leadSaveError && <p className="mx-auto mb-3 max-w-md text-center text-[9px] font-semibold text-red-600">{leadSaveError}</p>}

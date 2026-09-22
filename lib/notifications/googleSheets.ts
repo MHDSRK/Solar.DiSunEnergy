@@ -98,12 +98,14 @@ async function sheetsRequest<T>(config: ReturnType<typeof getConfig> extends inf
   return response.json() as Promise<T>
 }
 
+const SITE_VISIT_COLUMNS = ['Updated At', 'Lead ID', 'Name', 'Phone', 'Preferred Date', 'Preferred Time', 'Location', 'District', 'Locality', 'Area', 'Latitude', 'Longitude', 'Status']
+
 const LEAD_COLUMNS = [
   'Updated At', 'Lead ID', 'Name', 'Phone', 'District', 'Area', 'Bill (₹)',
   'Monthly KWH', 'Category', 'Recommended KW', 'Setup Cost', 'Subsidy',
   'Financing Amount', 'Customer Contribution', 'KSEB Consumer Number',
   'KSEB District', 'KSEB Section', 'Transformer', 'Feasibility Status',
-  'Requested KW', 'Remaining Transformer Capacity',
+  'Requested KW', 'Remaining Transformer Capacity', 'Lead Status', 'KSEB Allowed Capacity KW', 'KSEB Feasibility Issued KW', 'KSEB Grid Connected KW', 'KSEB Checked At',
 ]
 
 function leadRow(lead: LeadRecord) {
@@ -129,21 +131,26 @@ function leadRow(lead: LeadRecord) {
     lead.feasibility_status ?? '',
     lead.requested_kw ?? '',
     lead.remaining_transformer_capacity ?? '',
+    lead.lead_status ?? '',
+    lead.kseb_allowed_capacity_kw ?? '',
+    lead.kseb_feasibility_issued_kw ?? '',
+    lead.kseb_grid_connected_kw ?? '',
+    lead.kseb_checked_at ?? '',
   ]
 }
 
 async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>>) {
-  const range = `${encodeURIComponent(config.leadSheet)}!A1:U1`
+  const range = `${encodeURIComponent(config.leadSheet)}!A1:Z1`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
-  if (data.values?.[0]?.some(Boolean)) return
+  if ((data.values?.[0]?.length ?? 0) >= LEAD_COLUMNS.length) return
   await sheetsRequest(config, `/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
-    body: JSON.stringify({ range: `${config.leadSheet}!A1:U1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
+    body: JSON.stringify({ range: `${config.leadSheet}!A1:Z1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
   })
 }
 
 async function findLeadRow(config: NonNullable<ReturnType<typeof getConfig>>, leadId: string) {
-  const range = `${encodeURIComponent(config.leadSheet)}!A:A`
+  const range = `${encodeURIComponent(config.leadSheet)}!B:B`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
   const index = (data.values || []).findIndex((row) => String(row[0] ?? '').trim() === leadId)
   return index >= 1 ? index + 1 : null
@@ -160,12 +167,12 @@ export async function syncLeadToGoogleSheet(lead: LeadRecord) {
   const row = leadRow(lead)
   const existingRow = await findLeadRow(config, leadId)
   if (existingRow) {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:U${existingRow}?valueInputOption=USER_ENTERED`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:Z${existingRow}?valueInputOption=USER_ENTERED`, {
       method: 'PUT',
-      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:U${existingRow}`, majorDimension: 'ROWS', values: [row] }),
+      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:Z${existingRow}`, majorDimension: 'ROWS', values: [row] }),
     })
   } else {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:U?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:Z?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
       method: 'POST',
       body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
     })
@@ -177,6 +184,15 @@ export async function appendSiteVisitToGoogleSheet(siteVisit: LeadRecord) {
   const config = getConfig()
   if (!config) return { configured: false, saved: false }
 
+  const headerRange = `${encodeURIComponent(config.siteVisitSheet)}!A1:M1`
+  const header = await sheetsRequest<{ values?: string[][] }>(config, `/values/${headerRange}`)
+  if ((header.values?.[0]?.length ?? 0) < SITE_VISIT_COLUMNS.length) {
+    await sheetsRequest(config, `/values/${headerRange}?valueInputOption=RAW`, {
+      method: 'PUT',
+      body: JSON.stringify({ range: `${config.siteVisitSheet}!A1:M1`, majorDimension: 'ROWS', values: [SITE_VISIT_COLUMNS] }),
+    })
+  }
+
   const row = [
     new Date(String(siteVisit.updated_at || siteVisit.created_at || new Date().toISOString())).toISOString(),
     siteVisit.lead_id ?? '',
@@ -185,10 +201,15 @@ export async function appendSiteVisitToGoogleSheet(siteVisit: LeadRecord) {
     siteVisit.preferred_date ?? '',
     siteVisit.preferred_time ?? '',
     siteVisit.location ?? '',
+    siteVisit.district ?? '',
+    siteVisit.locality ?? '',
+    siteVisit.area ?? '',
+    siteVisit.latitude ?? '',
+    siteVisit.longitude ?? '',
     siteVisit.status ?? 'BOOKED',
   ]
 
-  await sheetsRequest(config, `/values/${encodeURIComponent(config.siteVisitSheet)}!A:H?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+  await sheetsRequest(config, `/values/${encodeURIComponent(config.siteVisitSheet)}!A:M?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
   })

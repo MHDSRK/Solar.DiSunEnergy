@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "pnpm typecheck && next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
