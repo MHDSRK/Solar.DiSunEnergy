@@ -331,15 +331,14 @@ requestAnimationFrame(() => {
                     <p className="text-center font-semibold text-slate-700">Balance Available</p>
                     <strong className={`mt-1 block text-base ${balanceAvailableKw <= 30 ? 'text-red-600' : 'text-green-600'}`}>{balanceAvailableKw} kW</strong>
                   </div>
+                  <p className="mt-3 border-t border-slate-200 pt-2 text-left text-[7px] leading-[1.2] tracking-[-0.01em] text-slate-500 whitespace-nowrap">
+                    <span className="block">This is a preliminary capacity check based on publicly retrieved KSEB transformer data.</span>
+                    <span className="block">Final feasibility and approval remain subject to KSEB&apos;s official process.</span>
+                  </p>
                 </div>
               )
             })()}
           </div>
-
-          <p className="mt-4 px-0 text-left text-[8px] leading-[1.25] tracking-[-0.01em] text-slate-500 whitespace-nowrap">
-            <span className="block">This is a preliminary capacity check based on publicly retrieved KSEB transformer data.</span>
-            <span className="block">Final feasibility and approval remain subject to KSEB&apos;s official process.</span>
-          </p>
           <button
             type="button"
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#1260a4] bg-white px-6 text-sm font-extrabold tracking-[0.08em] text-[#1260a4] shadow-none"
