@@ -61,7 +61,7 @@ export async function PATCH(request: Request) {
       'name','phone','district','area','bill','monthly_kwh','connection_category',
       'recommended_kw','setup_cost','subsidy','financing_amount','customer_contribution',
       'kseb_consumer_number','kseb_district','kseb_section','transformer',
-      'feasibility_status','requested_kw','remaining_transformer_capacity',
+      'feasibility_status','requested_kw','remaining_transformer_capacity','kseb_allowed_capacity_kw','kseb_feasibility_issued_kw','kseb_grid_connected_kw','kseb_checked_at',
     ]
     const entries = Object.entries(fields).filter(([key]) => allowed.includes(key))
     if (!entries.length) return NextResponse.json({ success: true, leadId })
