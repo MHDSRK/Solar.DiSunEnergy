@@ -36,6 +36,7 @@ export default function Page() {
   const [feasibilityResult, setFeasibilityResult] = useState<Record<string, unknown> | null>(null)
   const [isCheckingFeasibility, setIsCheckingFeasibility] = useState(false)
   const [calculationMode, setCalculationMode] = useState<'bill' | 'units'>('bill')
+  const [privacyConsent, setPrivacyConsent] = useState(false)
   const [form, setForm] = useState({ bill: '', category: '', fullName: '', phone: '', district: '', area: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isCalculating, setIsCalculating] = useState(false)
@@ -211,6 +212,7 @@ export default function Page() {
             subsidy: calculated.subsidy,
             financing_amount: calculated.loan,
             customer_contribution: calculated.netCost,
+            privacy_consent: privacyConsent,
           })
           if (!saved) console.error('Calculator lead update did not complete.')
         })()
@@ -305,7 +307,7 @@ requestAnimationFrame(() => {
     setIsCheckingFeasibility(true)
     setFeasibilityResult(null)
     try {
-      const response = await fetch('/api/kseb/transformer-feasibility', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consumerNumber: normalizedConsumerNumber, district: feasibilityForm.districtName, sectionId: feasibilityForm.sectionId, sectionOffice: feasibilityForm.sectionOffice, transformerId: feasibilityForm.transformerId, transformerName: feasibilityForm.transformerName, requestedKw: result?.kw }) })
+      const response = await fetch('/api/kseb/transformer-feasibility', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consumerNumber: normalizedConsumerNumber, districtId: feasibilityForm.districtId, district: feasibilityForm.districtName, sectionId: feasibilityForm.sectionId, sectionOffice: feasibilityForm.sectionOffice, transformerId: feasibilityForm.transformerId, transformerName: feasibilityForm.transformerName, requestedKw: result?.kw }) })
       const feasibilityData = await response.json()
       setFeasibilityResult(feasibilityData)
       if (feasibilityData.success) {
@@ -458,6 +460,7 @@ requestAnimationFrame(() => {
                 <label className="block text-[10px] font-medium">FULL NAME<input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} onBlur={(event) => validateField('fullName', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.fullName ? 'border-red-500' : 'border-slate-400'}`} />{errors.fullName && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.fullName}</span>}</label>
                 <label className="block text-[10px] font-medium">PHONE NUMBER<input value={form.phone} onChange={(event) => updateField('phone', event.target.value.replace(/\D/g, '').slice(0, 10))} onBlur={(event) => validateField('phone', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.phone ? 'border-red-500' : 'border-slate-400'}`} inputMode="numeric" maxLength={10} />{errors.phone && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.phone}</span>}</label>
                 <div className="grid grid-cols-2 gap-3"><label className="block text-[10px] font-medium">DISTRICT<select value={form.district} data-placeholder={!form.district} onChange={(event) => updateField('district', event.target.value)} onBlur={(event) => validateField('district', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-[#159600] ${errors.district ? 'border-red-500' : 'border-slate-400'}`}><option value="" className="text-gray-400">Select district</option>{keralaDistricts.map((district) => <option key={district} value={district}>{district}</option>)}</select>{errors.district && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.district}</span>}</label><label className="block text-[10px] font-medium">AREA<input value={form.area} onChange={(event) => updateField('area', event.target.value)} onBlur={(event) => validateField('area', event.target.value)} className={`mt-1 h-10 w-full rounded-lg border px-2 text-sm outline-none focus:border-[#159600] ${errors.area ? 'border-red-500' : 'border-slate-400'}`} />{errors.area && <span className="mt-1 block text-[9px] font-normal text-red-600">{errors.area}</span>}</label></div>
+                <label className="mt-3 flex items-start gap-2 text-[9px] leading-[1.25] text-slate-600"><input type="checkbox" checked={privacyConsent} onChange={(event) => { setPrivacyConsent(event.target.checked); setErrors((current) => ({ ...current, consent: '' })) }} className="mt-0.5 size-3 accent-[#1260a4]" /> <span>I agree to the <a href="/privacy-policy" target="_blank" rel="noreferrer" className="font-semibold underline">Privacy Policy</a> and <a href="/terms-of-service" target="_blank" rel="noreferrer" className="font-semibold underline">Terms & Conditions</a>.</span></label>{errors.consent && <span className="mt-1 block text-[9px] text-red-600">{errors.consent}</span>}
                 <button type="submit" className="mt-3 flex min-h-10 w-full items-center justify-center rounded-full bg-[#1260a4] px-6 text-sm font-extrabold tracking-[0.08em] text-white shadow-none">SUBMIT</button>
                 {isCalculating && <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-50 px-3 py-4 text-xs font-semibold text-slate-500"><span className="size-3 animate-spin rounded-full border-2 border-[#159600]/25 border-t-[#159600]" />Preparing your solar estimate...</div>}
                 {leadSaveError && <p className="mx-auto mb-3 max-w-md text-center text-[9px] font-semibold text-red-600">{leadSaveError}</p>}
