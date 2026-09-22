@@ -86,7 +86,8 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
   if (await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
     try {
       results.googleSheet = await syncLeadToGoogleSheet(lead)
-      if (results.googleSheet.saved || !results.googleSheet.configured) await completeNotification(eventKey, 'GOOGLE_SHEETS')
+      if (results.googleSheet.saved) await completeNotification(eventKey, 'GOOGLE_SHEETS')
+      else if (!results.googleSheet.configured) await failNotification(eventKey, 'GOOGLE_SHEETS', 'Google Sheets integration is not configured.')
     } catch (error) {
       await failNotification(eventKey, 'GOOGLE_SHEETS', error)
       console.error(`Google Sheet ${event} notification failed`, error)
@@ -96,7 +97,8 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
   if (await claimNotification(eventKey, 'WHATSAPP')) {
     try {
       results.whatsapp = await sendWhatsAppText(message)
-      if (results.whatsapp.sent || !results.whatsapp.configured) await completeNotification(eventKey, 'WHATSAPP')
+      if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
+      else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
       await failNotification(eventKey, 'WHATSAPP', error)
       console.error(`WhatsApp ${event} notification failed`, error)
@@ -127,7 +129,8 @@ export async function notifySiteVisit(lead: LeadRecord) {
         updated_at: lead.updated_at,
         created_at: lead.created_at,
       })
-      if (siteVisitResult.saved || !siteVisitResult.configured) await completeNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT')
+      if (siteVisitResult.saved) await completeNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT')
+      else if (!siteVisitResult.configured) await failNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT', 'Google Sheets integration is not configured.')
     } catch (error) {
       await failNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT', error)
       console.error('Google Sheet site visit append failed', error)
