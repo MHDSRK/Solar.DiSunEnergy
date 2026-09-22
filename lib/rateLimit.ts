@@ -25,7 +25,8 @@ export async function checkRateLimit(
     DO UPDATE SET request_count = api_rate_limits.request_count + 1
     RETURNING request_count
   `
-  const count = Number(rows[0]?.request_count ?? 1)
+  const typedRows = rows as unknown as Record<string, any>[]
+  const count = Number(typedRows[0]?.request_count ?? 1)
   return {
     limited: count > limit,
     count,
