@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
+import { notifySiteVisit } from '@/lib/notifications/leadNotifications'
 
 function isValidDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00`))
@@ -53,6 +54,37 @@ export async function POST(request: Request) {
       `,
       sql`UPDATE leads SET updated_at = NOW() WHERE lead_id = ${leadId}`,
     ])
+
+    const mergedRows = await sql`
+      SELECT
+        l.*,
+        sv.name AS site_visit_name,
+        sv.phone AS site_visit_phone,
+        sv.preferred_date,
+        sv.preferred_time,
+        sv.location AS site_visit_location,
+        sv.status AS site_visit_status,
+        sv.created_at AS site_visit_created_at,
+        sv.updated_at AS site_visit_updated_at
+      FROM leads l
+      JOIN site_visits sv ON sv.lead_id = l.lead_id
+      WHERE l.lead_id = ${leadId}
+      LIMIT 1
+    `
+    const lead = (mergedRows as unknown as Record<string, unknown>[])[0]
+    if (lead) {
+      void notifySiteVisit({
+        ...lead,
+        name: lead.site_visit_name,
+        phone: lead.site_visit_phone,
+        preferred_date: lead.preferred_date,
+        preferred_time: lead.preferred_time,
+        location: lead.site_visit_location,
+        status: lead.site_visit_status,
+        created_at: lead.site_visit_created_at,
+        updated_at: lead.site_visit_updated_at,
+      }).catch((error) => console.error('Site visit notifications failed', error))
+    }
 
     return NextResponse.json({ success: true, message: 'Site visit request received. Our executive will contact you soon.' })
   } catch (error) {
