@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     await ensureLeadTable()
     const sql = getSql()
     const leadExists = await sql`SELECT lead_id FROM leads WHERE lead_id = ${leadId} LIMIT 1`
-    if (!leadExists.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
+    const leadRows = leadExists as unknown as Record<string, any>[]
+    if (!leadRows.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
 
     await sql.transaction([
       sql`
