@@ -2,7 +2,7 @@ const DEFAULT_START_MINUTES = 9 * 60
 const DEFAULT_END_MINUTES = 18 * 60
 
 function toMinutes(value: string) {
-  const match = /^(\\d{2}):(\\d{2})$/.exec(value)
+  const match = /^(\d{2}):(\d{2})$/.exec(value)
   if (!match) return null
   const hours = Number(match[1])
   const minutes = Number(match[2])
@@ -15,13 +15,13 @@ export function getConfiguredHolidays() {
     (process.env.SITE_VISIT_HOLIDAYS ?? '')
       .split(',')
       .map((value) => value.trim())
-      .filter((value) => /^\\d{4}-\\d{2}-\\d{2}$/.test(value)),
+      .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)),
   )
 }
 
 export function validateSiteVisitSlot(date: string, time: string, now = new Date()) {
   const errors: string[] = []
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00`))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00`))) {
     return ['Please select a valid site visit date.']
   }
   const minutes = toMinutes(time)
@@ -33,7 +33,7 @@ export function validateSiteVisitSlot(date: string, time: string, now = new Date
     month: '2-digit',
     day: '2-digit',
   }).format(now)
-  const normalizedToday = indiaNow.replace(/\\//g, '-')
+  const normalizedToday = indiaNow.replace(/\//g, '-')
   if (date < normalizedToday) errors.push('Preferred date cannot be in the past.')
 
   const weekday = new Intl.DateTimeFormat('en-US', {
@@ -52,7 +52,7 @@ export function validateSiteVisitSlot(date: string, time: string, now = new Date
 }
 
 export function parseLocation(value: string) {
-  const match = /^\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*$/.exec(value)
+  const match = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(value)
   if (!match) return { latitude: null, longitude: null }
   const latitude = Number(match[1])
   const longitude = Number(match[2])
