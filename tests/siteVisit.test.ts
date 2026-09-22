@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseLocation, validateSiteVisitSlot } from '../lib/siteVisitRules'
+import { parseLocation, validateSiteVisitSlot } from '../lib/siteVisitRules.ts'
 
 test('site visit accepts a normal weekday during working hours', () => {
   const errors = validateSiteVisitSlot('2026-09-23', '10:00', new Date('2026-09-22T12:00:00+05:30'))
