@@ -140,7 +140,7 @@ function leadRow(lead: LeadRecord) {
 async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>>) {
   const range = `${encodeURIComponent(config.leadSheet)}!A1:Z1`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
-  if (data.values?.[0]?.some(Boolean)) return
+  if ((data.values?.[0]?.length ?? 0) >= LEAD_COLUMNS.length) return
   await sheetsRequest(config, `/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ range: `${config.leadSheet}!A1:Z1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
