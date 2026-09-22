@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Nexora — Build what’s next',
-  description: 'Nexora is a studio for the future-minded.',
+  title: 'DiSun — Solar Power Calculator',
+  description: 'DiSun Energy International solar power calculator and transformer feasibility tool.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -47,3 +47,4 @@ export default function RootLayout({
     </html>
   )
 }
+
