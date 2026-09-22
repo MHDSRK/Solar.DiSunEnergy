@@ -1,11 +1,17 @@
 import { neon } from '@neondatabase/serverless'
 
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured')
+let sqlClient: ReturnType<typeof neon> | null = null
 
-export const sql = neon(process.env.DATABASE_URL)
+export function getSql() {
+  if (sqlClient) return sqlClient
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) throw new Error('DATABASE_URL is not configured')
+  sqlClient = neon(databaseUrl)
+  return sqlClient
+}
 
 export async function ensureLeadTable() {
-  await sql`
+  await getSql()`
     CREATE TABLE IF NOT EXISTS leads (
       lead_id TEXT PRIMARY KEY,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
