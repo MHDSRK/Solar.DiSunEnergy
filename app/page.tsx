@@ -319,6 +319,10 @@ requestAnimationFrame(() => {
           feasibility_status: feasibilityData.status,
           requested_kw: feasibilityData.requestedKw,
           remaining_transformer_capacity: feasibilityData.remainingAfterInstallationKw,
+          kseb_allowed_capacity_kw: feasibilityData.transformer?.allowedCapacityKw,
+          kseb_feasibility_issued_kw: feasibilityData.transformer?.feasibilityIssuedKw,
+          kseb_grid_connected_kw: feasibilityData.transformer?.gridConnectedKw,
+          kseb_checked_at: feasibilityData.retrievedAt,
         })
         if (!saved) console.error('Feasibility lead update did not complete.')
       }
