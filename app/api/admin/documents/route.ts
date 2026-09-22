@@ -21,9 +21,10 @@ export async function GET(request: Request) {
       WHERE lead_id = ${leadId} AND document_type = ${documentType}
       LIMIT 1
     `
-    if (!rows.length) return NextResponse.json({ success: false, message: 'Document not found.' }, { status: 404 })
+    const typedRows = rows as unknown as Record<string, any>[]
+    if (!typedRows.length) return NextResponse.json({ success: false, message: 'Document not found.' }, { status: 404 })
 
-    const row = rows[0] as { file_name: string; mime_type: string; file_base64: string }
+    const row = typedRows[0] as { file_name: string; mime_type: string; file_base64: string }
     const bytes = Uint8Array.from(Buffer.from(row.file_base64, 'base64'))
     return new Response(bytes, {
       headers: {
