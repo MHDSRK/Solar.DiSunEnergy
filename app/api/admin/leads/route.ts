@@ -10,9 +10,10 @@ export async function GET() {
     const transactionResult = await sql.transaction([
       sql`SELECT * FROM leads ORDER BY created_at DESC`,
       sql`SELECT lead_id, document_type, file_name, mime_type, size_bytes, uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`,
-      sql`SELECT lead_id, name, phone, preferred_date, preferred_time, location, status, created_at, updated_at FROM site_visits ORDER BY created_at DESC`,
+      sql`SELECT lead_id, name, phone, preferred_date, preferred_time, location, district, locality, area, latitude, longitude, status, created_at, updated_at FROM site_visits ORDER BY created_at DESC`,
+      sql`SELECT event_key, channel, status, attempts, last_error, updated_at FROM notification_events ORDER BY updated_at DESC`,
     ])
-    const [leadRows, documentRows, siteVisitRows] = transactionResult as unknown as [Record<string, any>[], Record<string, any>[], Record<string, any>[]]
+    const [leadRows, documentRows, siteVisitRows, notificationRows] = transactionResult as unknown as [Record<string, any>[], Record<string, any>[], Record<string, any>[], Record<string, any>[]]
     const documentsByLead = new Map<string, any[]>()
     for (const document of documentRows) {
       const list = documentsByLead.get(String(document.lead_id)) ?? []
@@ -21,11 +22,19 @@ export async function GET() {
     }
     const siteVisitsByLead = new Map<string, any>()
     for (const visit of siteVisitRows) siteVisitsByLead.set(String(visit.lead_id), visit)
+    const notificationsByLead = new Map<string, any[]>()
+    for (const notification of notificationRows) {
+      const leadId = String(notification.event_key).split(':')[0]
+      const list = notificationsByLead.get(leadId) ?? []
+      list.push(notification)
+      notificationsByLead.set(leadId, list)
+    }
 
     const leads = leadRows.map((lead: any) => ({
       ...lead,
       documents: documentsByLead.get(String(lead.lead_id)) ?? [],
       site_visit: siteVisitsByLead.get(String(lead.lead_id)) ?? null,
+      notifications: notificationsByLead.get(String(lead.lead_id)) ?? [],
     }))
     const stats = {
       total: leads.length,
@@ -49,6 +58,7 @@ export async function DELETE(request: Request) {
     if (body.all === true) {
       if (body.confirmation !== 'DELETE ALL') return NextResponse.json({ success: false, message: 'Type DELETE ALL to confirm.' }, { status: 400 })
       await getSql()`DELETE FROM leads`
+      await getSql()`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ all: true })}::jsonb)`
       return NextResponse.json({ success: true })
     }
     const ids = Array.isArray(body.leadIds) ? body.leadIds.map(String).filter(Boolean) : []
@@ -56,6 +66,10 @@ export async function DELETE(request: Request) {
     await getSql().query(
       `DELETE FROM leads WHERE lead_id = ANY($1::text[])`,
       [ids],
+    )
+    await getSql().query(
+      `INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', $1::jsonb)`,
+      [JSON.stringify({ leadIds: ids })],
     )
     return NextResponse.json({ success: true, deleted: ids.length })
   } catch (error) {
