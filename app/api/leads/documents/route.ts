@@ -36,7 +36,8 @@ export async function POST(request: Request) {
 
     await ensureLeadTable()
     const exists = await getSql()`SELECT lead_id FROM leads WHERE lead_id = ${leadId} LIMIT 1`
-    if (!exists.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
+    const existingRows = exists as unknown as Record<string, any>[]
+    if (!existingRows.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
 
     const base64 = Buffer.from(await file.arrayBuffer()).toString('base64')
     await getSql()`
