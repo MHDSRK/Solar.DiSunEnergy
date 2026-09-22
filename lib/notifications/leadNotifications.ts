@@ -1,4 +1,5 @@
-import { syncLeadToGoogleSheet } from '@/lib/notifications/googleSheets'
+import { ensureLeadTable, getSql } from '@/lib/db'
+import { syncLeadToGoogleSheet, appendSiteVisitToGoogleSheet } from '@/lib/notifications/googleSheets'
 import { sendWhatsAppText } from '@/lib/notifications/whatsapp'
 
 type LeadRecord = Record<string, unknown>
@@ -7,19 +8,40 @@ function format(value: unknown) {
   return value === null || value === undefined || value === '' ? '-' : String(value)
 }
 
-export async function notifyLeadEvent(event: string, lead: LeadRecord) {
-  const leadId = format(lead.lead_id)
+async function claimNotification(eventKey: string, channel: string) {
+  await ensureLeadTable()
+  const rows = await getSql().query(
+    "INSERT INTO notification_events (event_key, channel, status, attempts, updated_at) VALUES ($1, $2, 'PROCESSING', 1, NOW()) ON CONFLICT (event_key, channel) DO UPDATE SET status = 'PROCESSING', attempts = notification_events.attempts + 1, updated_at = NOW() WHERE notification_events.status <> 'SENT' RETURNING event_key",
+    [eventKey, channel],
+  )
+  return (rows as unknown as Record<string, unknown>[]).length > 0
+}
+
+async function completeNotification(eventKey: string, channel: string) {
+  await getSql().query(
+    "UPDATE notification_events SET status = 'SENT', last_error = NULL, updated_at = NOW() WHERE event_key = $1 AND channel = $2",
+    [eventKey, channel],
+  )
+}
+
+async function failNotification(eventKey: string, channel: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  await getSql().query(
+    "UPDATE notification_events SET status = 'FAILED', last_error = $1, updated_at = NOW() WHERE event_key = $2 AND channel = $3",
+    [message.slice(0, 1000), eventKey, channel],
+  )
+}
+
+function eventMessage(event: string, lead: LeadRecord) {
   const common = [
-    `Lead ID: ${leadId}`,
+    `Lead ID: ${format(lead.lead_id)}`,
     `Name: ${format(lead.name)}`,
     `Phone: ${format(lead.phone)}`,
   ]
-
   const messages: Record<string, string[]> = {
     created: ['NEW LEAD CREATED', ...common],
     calculator: [
-      'CALCULATOR COMPLETED',
-      ...common,
+      'CALCULATOR COMPLETED', ...common,
       `District: ${format(lead.district)}`,
       `Monthly KWH: ${format(lead.monthly_kwh)}`,
       `Category: ${format(lead.connection_category)}`,
@@ -30,8 +52,7 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
       `Customer Contribution: ₹${format(lead.customer_contribution)}`,
     ],
     feasibility: [
-      'KSEB FEASIBILITY COMPLETED',
-      ...common,
+      'KSEB FEASIBILITY COMPLETED', ...common,
       `Consumer Number: ${format(lead.kseb_consumer_number)}`,
       `KSEB District: ${format(lead.kseb_district)}`,
       `Section: ${format(lead.kseb_section)}`,
@@ -42,48 +63,75 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     ],
     documents: ['DOCUMENTS RECEIVED', ...common, 'All four eligibility documents have been uploaded.'],
     site_visit: [
-      'SITE VISIT BOOKED',
-      ...common,
+      'SITE VISIT BOOKED', ...common,
       `Date: ${format(lead.preferred_date)}`,
       `Time: ${format(lead.preferred_time)}`,
       `Location: ${format(lead.location)}`,
     ],
   }
+  return messages[event]?.join('\n') ?? ''
+}
 
-  const lines = messages[event]
-  if (!lines) throw new Error(`Unknown lead notification event: ${event}`)
+export async function notifyLeadEvent(event: string, lead: LeadRecord) {
+  const leadId = format(lead.lead_id)
+  const eventKey = `${leadId}:${event.toUpperCase()}`
+  const message = eventMessage(event, lead)
+  if (!message) throw new Error(`Unknown lead notification event: ${event}`)
 
-  const [sheet, whatsapp] = await Promise.allSettled([
-    syncLeadToGoogleSheet(lead),
-    sendWhatsAppText(lines.join('\n')),
-  ])
-
-  if (sheet.status === 'rejected') console.error(`Google Sheet ${event} notification failed`, sheet.reason)
-  if (whatsapp.status === 'rejected') console.error(`WhatsApp ${event} notification failed`, whatsapp.reason)
-
-  return {
-    googleSheet: sheet.status === 'fulfilled' ? sheet.value : { configured: true, saved: false },
-    whatsapp: whatsapp.status === 'fulfilled' ? whatsapp.value : { configured: true, sent: false },
+  const results = {
+    googleSheet: { configured: false, saved: false },
+    whatsapp: { configured: false, sent: false },
   }
+
+  if (await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
+    try {
+      results.googleSheet = await syncLeadToGoogleSheet(lead)
+      if (results.googleSheet.saved || !results.googleSheet.configured) await completeNotification(eventKey, 'GOOGLE_SHEETS')
+    } catch (error) {
+      await failNotification(eventKey, 'GOOGLE_SHEETS', error)
+      console.error(`Google Sheet ${event} notification failed`, error)
+    }
+  }
+
+  if (await claimNotification(eventKey, 'WHATSAPP')) {
+    try {
+      results.whatsapp = await sendWhatsAppText(message)
+      if (results.whatsapp.sent || !results.whatsapp.configured) await completeNotification(eventKey, 'WHATSAPP')
+    } catch (error) {
+      await failNotification(eventKey, 'WHATSAPP', error)
+      console.error(`WhatsApp ${event} notification failed`, error)
+    }
+  }
+
+  return results
 }
 
 export async function notifySiteVisit(lead: LeadRecord) {
   const result = await notifyLeadEvent('site_visit', lead)
-  const siteVisit = {
-    lead_id: lead.lead_id,
-    name: lead.name,
-    phone: lead.phone,
-    preferred_date: lead.preferred_date,
-    preferred_time: lead.preferred_time,
-    location: lead.location,
-    status: lead.status,
-    updated_at: lead.updated_at,
-    created_at: lead.created_at,
-  }
-  try {
-    await import('@/lib/notifications/googleSheets').then(({ appendSiteVisitToGoogleSheet }) => appendSiteVisitToGoogleSheet(siteVisit))
-  } catch (error) {
-    console.error('Google Sheet site visit append failed', error)
+  const eventKey = `${format(lead.lead_id)}:SITE_VISIT_SHEET`
+  if (await claimNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT')) {
+    try {
+      const siteVisitResult = await appendSiteVisitToGoogleSheet({
+        lead_id: lead.lead_id,
+        name: lead.name,
+        phone: lead.phone,
+        preferred_date: lead.preferred_date,
+        preferred_time: lead.preferred_time,
+        location: lead.location,
+        district: lead.district,
+        locality: lead.locality,
+        area: lead.area,
+        latitude: lead.latitude,
+        longitude: lead.longitude,
+        status: lead.status,
+        updated_at: lead.updated_at,
+        created_at: lead.created_at,
+      })
+      if (siteVisitResult.saved || !siteVisitResult.configured) await completeNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT')
+    } catch (error) {
+      await failNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT', error)
+      console.error('Google Sheet site visit append failed', error)
+    }
   }
   return result
 }
