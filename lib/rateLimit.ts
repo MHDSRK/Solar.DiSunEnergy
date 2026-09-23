@@ -1,9 +1,13 @@
 import { ensureLeadTable, getSql } from '@/lib/db'
 
 function clientKey(request: Request, scope: string) {
+  // Vercel sanitizes X-Forwarded-For to prevent client IP spoofing. Prefer
+  // the Vercel-specific copy because it remains available when another proxy
+  // sits in front of the deployment.
+  const vercelForwarded = request.headers.get('x-vercel-forwarded-for')?.trim()
   const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-  const real = request.headers.get('x-real-ip')?.trim()
-  return `${scope}:${forwarded || real || 'unknown'}`
+  const ip = vercelForwarded || forwarded || 'unknown'
+  return `${scope}:${ip}`
 }
 
 export async function checkRateLimit(
@@ -14,7 +18,14 @@ export async function checkRateLimit(
 ) {
   await ensureLeadTable()
   const key = clientKey(request, scope)
-  const rows = await getSql()`
+  const sql = getSql()
+
+  await sql`
+    DELETE FROM api_rate_limits
+    WHERE window_start < now() - make_interval(secs => ${windowSeconds * 2})
+  `
+
+  const rows = await sql`
     INSERT INTO api_rate_limits (rate_key, window_start, request_count)
     VALUES (
       ${key},
