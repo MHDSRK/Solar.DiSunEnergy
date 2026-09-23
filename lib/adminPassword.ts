@@ -4,12 +4,23 @@ const KEY_LENGTH = 64
 const DEFAULT_N = 16384
 const DEFAULT_R = 8
 const DEFAULT_P = 1
+const MAX_MEM = 32 * 1024 * 1024
 
-function deriveKey(password: string, salt: Buffer, length: number, _N: number, _r: number, _p: number) {
+type ScryptWithOptions = (
+  password: string,
+  salt: Buffer,
+  keylen: number,
+  options: { N: number; r: number; p: number; maxmem: number },
+  callback: (error: Error | null, derivedKey: Buffer) => void,
+) => void
+
+const scryptWithOptions = scryptCallback as unknown as ScryptWithOptions
+
+function deriveKey(password: string, salt: Buffer, length: number, N: number, r: number, p: number) {
   return new Promise<Buffer>((resolve, reject) => {
-    scryptCallback(password, salt, length, (error, derivedKey) => {
+    scryptWithOptions(password, salt, length, { N, r, p, maxmem: MAX_MEM }, (error, derivedKey) => {
       if (error) reject(error)
-      else resolve(derivedKey as Buffer)
+      else resolve(derivedKey)
     })
   })
 }
@@ -28,13 +39,16 @@ export async function verifyAdminPassword(password: string, encoded: string) {
   const N = Number(nText)
   const r = Number(rText)
   const p = Number(pText)
-  if (!Number.isSafeInteger(N) || !Number.isSafeInteger(r) || !Number.isSafeInteger(p)) return false
-  if (N < 16384 || N > 262144 || r < 1 || r > 32 || p < 1 || p > 4) return false
+
+  // Only accept the parameters produced by this application's generator.
+  // This also prevents an attacker from forcing an unexpectedly expensive scrypt operation.
+  if (N !== DEFAULT_N || r !== DEFAULT_R || p !== DEFAULT_P) return false
 
   try {
     const salt = Buffer.from(saltText, 'base64url')
     const expected = Buffer.from(hashText, 'base64url')
-    if (salt.length < 16 || expected.length !== KEY_LENGTH) return false
+    if (salt.length !== 16 || expected.length !== KEY_LENGTH) return false
+
     const derived = await deriveKey(password, salt, expected.length, N, r, p)
     return timingSafeEqual(derived, expected)
   } catch {
