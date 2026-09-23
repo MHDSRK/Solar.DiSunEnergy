@@ -1,20 +1,22 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
-import { promisify } from 'node:util'
 
-const scrypt = promisify(scryptCallback)
 const KEY_LENGTH = 64
 const DEFAULT_N = 16384
 const DEFAULT_R = 8
 const DEFAULT_P = 1
 
+function deriveKey(password: string, salt: Buffer, length: number, N: number, r: number, p: number) {
+  return new Promise<Buffer>((resolve, reject) => {
+    scryptCallback(password, salt, length, { N, r, p, maxmem: 32 * 1024 * 1024 }, (error, derivedKey) => {
+      if (error) reject(error)
+      else resolve(derivedKey as Buffer)
+    })
+  })
+}
+
 export async function hashAdminPassword(password: string) {
   const salt = randomBytes(16)
-  const derived = await scrypt(password, salt, KEY_LENGTH, {
-    N: DEFAULT_N,
-    r: DEFAULT_R,
-    p: DEFAULT_P,
-    maxmem: 32 * 1024 * 1024,
-  }) as Buffer
+  const derived = await deriveKey(password, salt, KEY_LENGTH, DEFAULT_N, DEFAULT_R, DEFAULT_P)
   return `scrypt$${DEFAULT_N}$${DEFAULT_R}$${DEFAULT_P}$${salt.toString('base64url')}$${derived.toString('base64url')}`
 }
 
@@ -33,12 +35,7 @@ export async function verifyAdminPassword(password: string, encoded: string) {
     const salt = Buffer.from(saltText, 'base64url')
     const expected = Buffer.from(hashText, 'base64url')
     if (salt.length < 16 || expected.length !== KEY_LENGTH) return false
-    const derived = await scrypt(password, salt, expected.length, {
-      N,
-      r,
-      p,
-      maxmem: 32 * 1024 * 1024,
-    }) as Buffer
+    const derived = await deriveKey(password, salt, expected.length, N, r, p)
     return timingSafeEqual(derived, expected)
   } catch {
     return false
