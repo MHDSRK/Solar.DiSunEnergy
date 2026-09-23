@@ -21,12 +21,14 @@ function format(value: unknown) {
 
 function templateParameters(lead: Record<string, unknown>) {
   return [
-    format(lead.connection_category || 'Solar'),
+    format(lead.lead_id),
     format(lead.name),
     format(lead.phone),
-    [format(lead.district), 'Kerala'].filter(Boolean).join(', '),
-    `Bill ₹${format(lead.bill)} | Estimated System ${format(lead.recommended_kw)} kW`,
-    format(lead.lead_id),
+    format(lead.district),
+    format(lead.area),
+    format(lead.bill),
+    format(lead.connection_category || 'Solar'),
+    format(lead.recommended_kw),
   ]
 }
 
