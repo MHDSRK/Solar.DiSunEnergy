@@ -7,15 +7,7 @@ const r = 8
 const p = 1
 const MAX_MEM = 32 * 1024 * 1024
 
-type ScryptWithOptions = (
-  password: string,
-  salt: Buffer,
-  keylen: number,
-  options: { N: number; r: number; p: number; maxmem: number },
-  callback: (error: Error | null, derivedKey: Buffer) => void,
-) => void
-
-const scryptWithOptions = scryptCallback as unknown as ScryptWithOptions
+const scryptWithOptions = scryptCallback
 
 function deriveKey(password, salt) {
   return new Promise((resolve, reject) => {
