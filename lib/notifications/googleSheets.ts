@@ -102,16 +102,18 @@ async function sheetsRequest<T>(config: ReturnType<typeof getConfig> extends inf
 const SITE_VISIT_COLUMNS = ['Updated At', 'Lead ID', 'Name', 'Phone', 'Preferred Date', 'Preferred Time', 'Location', 'District', 'Locality', 'Area', 'Latitude', 'Longitude', 'Status']
 
 const LEAD_COLUMNS = [
-  'Updated At', 'Lead ID', 'Name', 'Phone', 'District', 'Area', 'Bill (₹)',
+  'Updated At', 'Created At', 'Lead ID', 'Name', 'Phone', 'District', 'Area', 'Bill (₹)',
   'Monthly KWH', 'Category', 'Recommended KW', 'Setup Cost', 'Subsidy',
   'Financing Amount', 'Customer Contribution', 'KSEB Consumer Number',
   'KSEB District', 'KSEB Section', 'Transformer', 'Feasibility Status',
-  'Requested KW', 'Remaining Transformer Capacity', 'Lead Status', 'KSEB Allowed Capacity KW', 'KSEB Feasibility Issued KW', 'KSEB Grid Connected KW', 'KSEB Checked At',
+  'Requested KW', 'Remaining Transformer Capacity', 'KSEB Allowed Capacity KW', 'KSEB Feasibility Issued KW', 'KSEB Grid Connected KW', 'KSEB Checked At',
+  'Lead Status', 'Privacy Consent', 'Privacy Consent At', 'Terms Version', 'Calculated At', 'Feasibility Checked At', 'Documents Completed At', 'Site Visit Booked At', 'Converted At',
 ]
 
 function leadRow(lead: LeadRecord) {
   return [
     new Date(String(lead.updated_at || lead.created_at || new Date().toISOString())).toISOString(),
+    lead.created_at ? new Date(String(lead.created_at)).toISOString() : '',
     lead.lead_id ?? '',
     lead.name ?? '',
     lead.phone ?? '',
@@ -132,21 +134,29 @@ function leadRow(lead: LeadRecord) {
     lead.feasibility_status ?? '',
     lead.requested_kw ?? '',
     lead.remaining_transformer_capacity ?? '',
-    lead.lead_status ?? '',
     lead.kseb_allowed_capacity_kw ?? '',
     lead.kseb_feasibility_issued_kw ?? '',
     lead.kseb_grid_connected_kw ?? '',
     lead.kseb_checked_at ?? '',
+    lead.lead_status ?? '',
+    lead.privacy_consent ?? '',
+    lead.privacy_consent_at ?? '',
+    lead.terms_version ?? '',
+    lead.calculated_at ?? '',
+    lead.feasibility_checked_at ?? '',
+    lead.documents_completed_at ?? '',
+    lead.site_visit_booked_at ?? '',
+    lead.converted_at ?? '',
   ]
 }
 
 async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>>) {
-  const range = `${encodeURIComponent(config.leadSheet)}!A1:Z1`
+  const range = `${encodeURIComponent(config.leadSheet)}!A1:AH1`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
   if ((data.values?.[0]?.length ?? 0) >= LEAD_COLUMNS.length) return
   await sheetsRequest(config, `/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
-    body: JSON.stringify({ range: `${config.leadSheet}!A1:Z1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
+    body: JSON.stringify({ range: `${config.leadSheet}!A1:AH1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
   })
 }
 
@@ -168,12 +178,12 @@ export async function syncLeadToGoogleSheet(lead: LeadRecord) {
   const row = leadRow(lead)
   const existingRow = await findLeadRow(config, leadId)
   if (existingRow) {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:Z${existingRow}?valueInputOption=USER_ENTERED`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:AH${existingRow}?valueInputOption=USER_ENTERED`, {
       method: 'PUT',
       body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:Z${existingRow}`, majorDimension: 'ROWS', values: [row] }),
     })
   } else {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:Z:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:AH:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
       method: 'POST',
       body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
     })
