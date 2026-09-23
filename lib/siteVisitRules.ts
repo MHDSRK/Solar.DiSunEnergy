@@ -1,6 +1,18 @@
 const DEFAULT_START_MINUTES = 9 * 60
 const DEFAULT_END_MINUTES = 18 * 60
 
+export function isValidCalendarDate(value: string) {
+  const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+}
+
 function toMinutes(value: string) {
   const match = /^(\d{2}):(\d{2})$/.exec(value)
   if (!match) return null
@@ -21,7 +33,7 @@ export function getConfiguredHolidays() {
 
 export function validateSiteVisitSlot(date: string, time: string, now = new Date()) {
   const errors: string[] = []
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00`))) {
+  if (!isValidCalendarDate(date)) {
     return ['Please select a valid site visit date.']
   }
   const minutes = toMinutes(time)
