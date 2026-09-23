@@ -4,7 +4,7 @@ import { verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
 import { notifyLeadEvent } from '@/lib/notifications/leadNotifications'
 
-const MAX_FILE_SIZE = 4 * 1024 * 1024
+const MAX_FILE_SIZE = 3 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
 const ALLOWED_DOCUMENTS = new Set(['aadhaar', 'pan', 'bill', 'passbook'])
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Only PDF, JPG, PNG or WEBP files are allowed.' }, { status: 400 })
     }
     if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ success: false, message: 'Each document must be between 1 byte and 4 MB.' }, { status: 400 })
+      return NextResponse.json({ success: false, message: 'Each document must be between 1 byte and 3 MB.' }, { status: 400 })
     }
     if (!(await hasValidFileSignature(file))) {
       return NextResponse.json({ success: false, message: 'The uploaded file does not match its declared file type.' }, { status: 400 })
@@ -53,10 +53,10 @@ export async function POST(request: Request) {
     const existingRows = exists as unknown as Record<string, any>[]
     if (!existingRows.length) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
 
-    const base64 = Buffer.from(await file.arrayBuffer()).toString('base64')
+    const fileData = new Uint8Array(await file.arrayBuffer())
     await getSql()`
       INSERT INTO lead_documents (lead_id, document_type, file_name, mime_type, size_bytes, file_data, uploaded_at)
-      VALUES (${leadId}, ${documentType}, ${file.name.slice(0, 180)}, ${file.type}, ${file.size}, decode(${base64}, 'base64'), NOW())
+      VALUES (${leadId}, ${documentType}, ${file.name.slice(0, 180)}, ${file.type}, ${file.size}, ${fileData}, NOW())
       ON CONFLICT (lead_id, document_type)
       DO UPDATE SET
         file_name = EXCLUDED.file_name,
