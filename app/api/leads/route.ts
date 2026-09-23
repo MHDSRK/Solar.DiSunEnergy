@@ -27,12 +27,17 @@ export async function POST(request: Request) {
 
     await ensureLeadTable()
     const leadId = makeLeadId()
+    const leadToken = createLeadToken(leadId)
+
     await getSql()`INSERT INTO leads (lead_id) VALUES (${leadId})`
 
     const lead = await getLead(leadId)
     if (lead) void notifyLeadEvent('created', lead).catch((error) => console.error('Lead creation notifications failed', error))
 
-    return NextResponse.json({ success: true, leadId, leadToken: createLeadToken(leadId) })
+    return NextResponse.json(
+      { success: true, leadId, leadToken },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
   } catch (error) {
     console.error('Lead creation failed', error)
     return NextResponse.json({ success: false, message: 'Unable to create lead.' }, { status: 500 })
