@@ -173,7 +173,7 @@ export async function syncLeadToGoogleSheet(lead: LeadRecord) {
       body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:Z${existingRow}`, majorDimension: 'ROWS', values: [row] }),
     })
   } else {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:Z?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:Z:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
       method: 'POST',
       body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
     })
@@ -210,7 +210,7 @@ export async function appendSiteVisitToGoogleSheet(siteVisit: LeadRecord) {
     siteVisit.status ?? 'BOOKED',
   ]
 
-  await sheetsRequest(config, `/values/${encodeURIComponent(config.siteVisitSheet)}!A:M?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+  await sheetsRequest(config, `/values/${encodeURIComponent(config.siteVisitSheet)}!A:M:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
   })
