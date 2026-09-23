@@ -5,9 +5,9 @@ const DEFAULT_N = 16384
 const DEFAULT_R = 8
 const DEFAULT_P = 1
 
-function deriveKey(password: string, salt: Buffer, length: number, N: number, r: number, p: number) {
+function deriveKey(password: string, salt: Buffer, length: number, _N: number, _r: number, _p: number) {
   return new Promise<Buffer>((resolve, reject) => {
-    scryptCallback(password, salt, length, { N, r, p, maxmem: 32 * 1024 * 1024 }, (error, derivedKey) => {
+    scryptCallback(password, salt, length, (error, derivedKey) => {
       if (error) reject(error)
       else resolve(derivedKey as Buffer)
     })
