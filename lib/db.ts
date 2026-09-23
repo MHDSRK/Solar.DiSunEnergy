@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless'
 
 let sqlClient: ReturnType<typeof neon> | null = null
+let leadTablePromise: Promise<void> | null = null
 
 export function getSql() {
   if (sqlClient) return sqlClient
@@ -11,7 +12,10 @@ export function getSql() {
 }
 
 export async function ensureLeadTable() {
-  const sql = getSql()
+  if (leadTablePromise) return leadTablePromise
+
+  leadTablePromise = (async () => {
+    const sql = getSql()
   await sql`
     CREATE TABLE IF NOT EXISTS leads (
       lead_id TEXT PRIMARY KEY,
@@ -180,4 +184,12 @@ export async function ensureLeadTable() {
     CREATE INDEX IF NOT EXISTS api_rate_limits_window_idx
     ON api_rate_limits (window_start)
   `
+  })()
+
+  try {
+    await leadTablePromise
+  } catch (error) {
+    leadTablePromise = null
+    throw error
+  }
 }
