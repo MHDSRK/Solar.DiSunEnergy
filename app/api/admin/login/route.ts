@@ -9,20 +9,16 @@ export async function POST(request: Request) {
     if (rate.limited) return rateLimitResponse(rate.retryAfter)
 
     const body = await request.json()
-    const email = String(body.email ?? '').trim().toLowerCase()
     const password = String(body.password ?? '')
-    const configuredEmail = String(process.env.ADMIN_EMAIL ?? '').trim().toLowerCase()
-    const configuredUsername = String(process.env.ADMIN_USERNAME ?? '').trim()
-    const loginIdentity = configuredUsername || configuredEmail
+    const loginIdentity = 'admin'
     const passwordHash = String(process.env.ADMIN_PASSWORD_HASH ?? '')
-    if (!loginIdentity || !passwordHash || !process.env.ADMIN_SESSION_SECRET) {
+    if (!passwordHash || !process.env.ADMIN_SESSION_SECRET) {
       return NextResponse.json({ success: false, message: 'Admin authentication is not configured.' }, { status: 500 })
     }
 
     const validPassword = await verifyAdminPassword(password, passwordHash)
-    const identityMatches = configuredUsername ? email === configuredUsername.toLowerCase() : email === configuredEmail
-    if (!identityMatches || !validPassword) {
-      return NextResponse.json({ success: false, message: 'Invalid email or password.' }, { status: 401 })
+    if (!validPassword) {
+      return NextResponse.json({ success: false, message: 'Invalid password.' }, { status: 401 })
     }
 
     const response = NextResponse.json({ success: true })
