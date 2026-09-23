@@ -1,4 +1,4 @@
-type WhatsAppResult = { configured: boolean; sent: boolean }
+type WhatsAppResult = { configured: boolean; sent: boolean; messageId?: string }
 
 const recipient = () => process.env.WHATSAPP_RECIPIENT?.trim() || '919567398698'
 
@@ -10,10 +10,27 @@ function config() {
     accessToken,
     phoneNumberId,
     version: process.env.WHATSAPP_GRAPH_API_VERSION?.trim() || 'v22.0',
+    templateName: process.env.WHATSAPP_TEMPLATE_NAME?.trim() || 'disun_new_lead',
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE?.trim() || 'en_US',
   }
 }
 
-export async function sendWhatsAppText(message: string): Promise<WhatsAppResult> {
+function format(value: unknown) {
+  return value === null || value === undefined || value === '' ? '-' : String(value)
+}
+
+function templateParameters(lead: Record<string, unknown>) {
+  return [
+    format(lead.connection_category || 'Solar'),
+    format(lead.name),
+    format(lead.phone),
+    [format(lead.district), 'Kerala'].filter(Boolean).join(', '),
+    `Bill ₹${format(lead.bill)} | Estimated System ${format(lead.recommended_kw)} kW`,
+    format(lead.lead_id),
+  ]
+}
+
+export async function sendWhatsAppLeadTemplate(lead: Record<string, unknown>): Promise<WhatsAppResult> {
   const current = config()
   if (!current) return { configured: false, sent: false }
 
@@ -27,16 +44,25 @@ export async function sendWhatsAppText(message: string): Promise<WhatsAppResult>
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: recipient(),
-      type: 'text',
-      text: { preview_url: false, body: message.slice(0, 4000) },
+      type: 'template',
+      template: {
+        name: current.templateName,
+        language: { code: current.templateLanguage },
+        components: [{
+          type: 'body',
+          parameters: templateParameters(lead).map((text) => ({ type: 'text', text })),
+        }],
+      },
     }),
     cache: 'no-store',
   })
 
+  const details = await response.text()
   if (!response.ok) {
-    const details = await response.text()
-    throw new Error(`WhatsApp notification failed (${response.status}): ${details.slice(0, 800)}`)
+    throw new Error(`WhatsApp template notification failed (${response.status}): ${details.slice(0, 1000)}`)
   }
 
-  return { configured: true, sent: true }
+  let data: { messages?: Array<{ id?: string }> } = {}
+  try { data = JSON.parse(details) as typeof data } catch {}
+  return { configured: true, sent: true, messageId: data.messages?.[0]?.id }
 }
