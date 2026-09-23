@@ -8,7 +8,7 @@ export async function GET() {
     await ensureLeadTable()
     const sql = getSql()
     const transactionResult = await sql.transaction([
-      sql`SELECT * FROM leads ORDER BY created_at DESC`,
+      sql`SELECT lead_id, created_at, updated_at, lead_status, name, phone, email, district, area, monthly_kwh, connection_category, recommended_kw, setup_cost, subsidy, financing_amount, customer_contribution, kseb_consumer_number, kseb_district, kseb_section, transformer, feasibility_status, requested_kw, remaining_transformer_capacity, privacy_consent, site_visit_booked_at FROM leads ORDER BY created_at DESC`,
       sql`SELECT lead_id, document_type, file_name, mime_type, size_bytes, uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`,
       sql`SELECT lead_id, name, phone, preferred_date, preferred_time, location, district, locality, area, latitude, longitude, status, created_at, updated_at FROM site_visits ORDER BY created_at DESC`,
       sql`SELECT event_key, channel, status, attempts, last_error, updated_at FROM notification_events ORDER BY updated_at DESC`,
@@ -55,22 +55,25 @@ export async function DELETE(request: Request) {
     await requireAdmin()
     await ensureLeadTable()
     const body = await request.json().catch(() => ({}))
+    const sql = getSql()
+
     if (body.all === true) {
       if (body.confirmation !== 'DELETE ALL') return NextResponse.json({ success: false, message: 'Type DELETE ALL to confirm.' }, { status: 400 })
-      await getSql()`DELETE FROM leads`
-      await getSql()`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ all: true })}::jsonb)`
+      await sql.transaction([
+        sql`DELETE FROM leads`,
+        sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ all: true })}::jsonb)`,
+      ])
       return NextResponse.json({ success: true })
     }
+
     const ids = Array.isArray(body.leadIds) ? body.leadIds.map(String).filter(Boolean) : []
     if (!ids.length) return NextResponse.json({ success: false, message: 'No leads selected.' }, { status: 400 })
-    await getSql().query(
-      `DELETE FROM leads WHERE lead_id = ANY($1::text[])`,
-      [ids],
-    )
-    await getSql().query(
-      `INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', $1::jsonb)`,
-      [JSON.stringify({ leadIds: ids })],
-    )
+
+    const idArray = ids
+    await sql.transaction([
+      sql`DELETE FROM leads WHERE lead_id = ANY(${idArray}::text[])`,
+      sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ leadIds: ids })}::jsonb)`,
+    ])
     return NextResponse.json({ success: true, deleted: ids.length })
   } catch (error) {
     const unauthorized = error instanceof Error && error.message === 'UNAUTHORIZED'
