@@ -32,7 +32,15 @@ export async function POST(request: Request) {
     await getSql()`INSERT INTO leads (lead_id) VALUES (${leadId})`
 
     const lead = await getLead(leadId)
-    if (lead) {\n      after(async () => {\n        try {\n          await notifyLeadEvent('created', lead)\n        } catch (error) {\n          console.error('Lead creation notifications failed', error)\n        }\n      })\n    }
+    if (lead) {
+      after(async () => {
+        try {
+          await notifyLeadEvent('created', lead)
+        } catch (error) {
+          console.error('Lead creation notifications failed', error)
+        }
+      })
+    }
 
     return NextResponse.json(
       { success: true, leadId, leadToken },
