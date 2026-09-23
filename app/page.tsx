@@ -583,7 +583,7 @@ export default function Page() {
                 <p className="mt-1 text-center text-[10px] font-medium text-slate-500">Provide your documents to calculate loan &amp; Subsidy eligibility</p>
 
                 <form onSubmit={submitEligibility} className="mt-4 space-y-3" noValidate>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
                     {([
                       ['aadhaar', 'Aadhaar Card'],
                       ['pan', 'PAN Card'],
