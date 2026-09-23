@@ -33,7 +33,7 @@ export function verifySession(value?: string) {
   if (parts.length !== 3) return false
 
   const [encodedIdentity, timestamp, signature] = parts
-  if (!encodedIdentity || !/^\\d+$/.test(timestamp)) return false
+  if (!encodedIdentity || !/^\d+$/.test(timestamp)) return false
 
   const identity = decodeIdentity(encodedIdentity)
   if (!identity) return false
