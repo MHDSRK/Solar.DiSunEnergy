@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     ])
 
     const mergedRows = await sql`
-      SELECT l.lead_id, l.name, l.phone, l.location, l.district, l.area,
+      SELECT l.lead_id, l.name, l.phone, l.district, l.area,
         sv.name AS site_visit_name, sv.phone AS site_visit_phone,
         sv.preferred_date, sv.preferred_time, sv.location AS site_visit_location,
         sv.district AS site_visit_district, sv.locality AS site_visit_locality,
