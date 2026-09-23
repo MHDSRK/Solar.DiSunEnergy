@@ -9,7 +9,6 @@ const dateFmt = (value: unknown) => value ? new Date(String(value)).toLocaleStri
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [leads, setLeads] = useState<Lead[]>([])
@@ -101,9 +100,8 @@ export default function AdminPage() {
         <div className="mx-auto h-12 w-16 overflow-hidden rounded-xl bg-white"><img src={`https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image-B6267883-BYNKz4nIws4F3XvdcZk2uddggsWgeT.jpeg`} alt="DiSun" className="h-full w-full object-cover" /></div>
         <h1 className="mt-5 text-center text-2xl font-extrabold">ADMIN LOGIN</h1>
         <p className="mt-1 text-center text-[10px] text-slate-500">DiSun Energy International</p>
-        <form noValidate className="mt-6 space-y-3" onSubmit={async e => { e.preventDefault(); setLoginError(''); const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})}); const d=await r.json().catch(() => ({})); if(!r.ok){setLoginError(d.message||'Login failed.');return} setAuthenticated(true); await load() }}>
-          <label className="block text-[10px] font-medium">EMAIL / USERNAME<input value={email} onChange={e=>setEmail(e.target.value)} type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="Enter your admin login" className="mt-1 h-10 w-full rounded-lg border border-slate-400 px-2 text-sm outline-none focus:border-[#159600]" /></label>
-          <label className="block text-[10px] font-medium">PASSWORD<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" className="mt-1 h-10 w-full rounded-lg border border-slate-400 px-2 text-sm outline-none focus:border-[#159600]" /></label>
+        <form noValidate className="mt-6 space-y-3" onSubmit={async e => { e.preventDefault(); setLoginError(''); const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})}); const d=await r.json().catch(() => ({})); if(!r.ok){setLoginError(d.message||'Login failed.');return} setAuthenticated(true); await load() }}>
+          <label className="block text-[10px] font-medium">PASSWORD<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" placeholder="Enter admin password" className="mt-1 h-10 w-full rounded-lg border border-slate-400 px-2 text-sm outline-none focus:border-[#159600]" /></label>
           {loginError && <p className="text-[9px] text-red-600">{loginError}</p>}
           <button className="mt-2 flex min-h-11 w-full items-center justify-center rounded-full bg-[#1260a4] text-sm font-extrabold tracking-[.08em] text-white">LOGIN</button>
         </form>
