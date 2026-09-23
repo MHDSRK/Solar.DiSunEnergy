@@ -1,4 +1,4 @@
-import { after, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { createLeadToken, verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
@@ -33,13 +33,11 @@ export async function POST(request: Request) {
 
     const lead = await getLead(leadId)
     if (lead) {
-      after(async () => {
-        try {
-          await notifyLeadEvent('created', lead)
-        } catch (error) {
-          console.error('Lead creation notifications failed', error)
-        }
-      })
+      try {
+        await notifyLeadEvent('created', lead)
+      } catch (error) {
+        console.error('Lead creation notifications failed', error)
+      }
     }
 
     return NextResponse.json(
@@ -140,7 +138,13 @@ export async function PATCH(request: Request) {
     const lead = await getLead(leadId)
     if (lead) {
       const event = hasFeasibility ? 'feasibility' : hasCalculator ? 'calculator' : ''
-      if (event) void notifyLeadEvent(event, lead).catch((error) => console.error(`Lead ${event} notifications failed`, error))
+      if (event) {
+        try {
+          await notifyLeadEvent(event, lead)
+        } catch (error) {
+          console.error(`Lead ${event} notifications failed`, error)
+        }
+      }
     }
 
     return NextResponse.json({ success: true, leadId })
