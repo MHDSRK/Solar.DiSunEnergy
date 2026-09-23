@@ -93,7 +93,8 @@ async function sheetsRequest<T>(config: ReturnType<typeof getConfig> extends inf
   })
   if (!response.ok) {
     const details = await response.text()
-    throw new Error(`Google Sheets request failed (${response.status}): ${details.slice(0, 800)}`)
+    const cleanDetails = details.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim()
+    throw new Error(`Google Sheets request failed (${response.status}): ${cleanDetails.slice(0, 1000)}`)
   }
   return response.json() as Promise<T>
 }
@@ -139,47 +140,7 @@ function leadRow(lead: LeadRecord) {
   ]
 }
 
-async function ensureSheetColumns(
-  config: NonNullable<ReturnType<typeof getConfig>>,
-  sheetName: string,
-  requiredColumns: number,
-) {
-  const metadata = await sheetsRequest<{
-    sheets?: Array<{
-      properties?: {
-        sheetId?: number
-        title?: string
-        gridProperties?: { columnCount?: number }
-      }
-    }>
-  }>(config, '?fields=sheets(properties(sheetId,title,gridProperties(columnCount)))')
-
-  const sheet = metadata.sheets?.find((item) => item.properties?.title === sheetName)
-  const sheetId = sheet?.properties?.sheetId
-  const columnCount = sheet?.properties?.gridProperties?.columnCount ?? 0
-
-  if (sheetId === undefined) {
-    throw new Error(`Google Sheet tab "${sheetName}" was not found.`)
-  }
-
-  if (columnCount < requiredColumns) {
-    await sheetsRequest(config, ':batchUpdate', {
-      method: 'POST',
-      body: JSON.stringify({
-        requests: [{
-          appendDimension: {
-            sheetId,
-            dimension: 'COLUMNS',
-            length: requiredColumns - columnCount,
-          },
-        }],
-      }),
-    })
-  }
-}
-
 async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>>) {
-  await ensureSheetColumns(config, config.leadSheet, LEAD_COLUMNS.length)
   const range = `${encodeURIComponent(config.leadSheet)}!A1:Z1`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
   if ((data.values?.[0]?.length ?? 0) >= LEAD_COLUMNS.length) return
@@ -224,7 +185,6 @@ export async function appendSiteVisitToGoogleSheet(siteVisit: LeadRecord) {
   const config = getConfig()
   if (!config) return { configured: false, saved: false }
 
-  await ensureSheetColumns(config, config.siteVisitSheet, SITE_VISIT_COLUMNS.length)
   const headerRange = `${encodeURIComponent(config.siteVisitSheet)}!A1:M1`
   const header = await sheetsRequest<{ values?: string[][] }>(config, `/values/${headerRange}`)
   if ((header.values?.[0]?.length ?? 0) < SITE_VISIT_COLUMNS.length) {
