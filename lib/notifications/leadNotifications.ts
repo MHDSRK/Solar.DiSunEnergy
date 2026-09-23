@@ -94,14 +94,16 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     }
   }
 
-  if (await claimNotification(eventKey, 'WHATSAPP')) {
+  // WhatsApp is intentionally sent only once, after the first CALCULATE submission.
+  // CREATED happens before the form data exists; FEASIBILITY and later events must not send another WhatsApp.
+  if (event === 'calculator' && await claimNotification(eventKey, 'WHATSAPP')) {
     try {
       results.whatsapp = await sendWhatsAppLeadTemplate(lead)
       if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
       else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
       await failNotification(eventKey, 'WHATSAPP', error)
-      console.error(`WhatsApp ${event} notification failed`, error)
+      console.error('WhatsApp lead notification failed', error)
     }
   }
 
