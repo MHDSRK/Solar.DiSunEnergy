@@ -3,7 +3,6 @@ export type ProductionCheck = { name: string; configured: boolean }
 export function getProductionChecks(env = process.env): ProductionCheck[] {
   return [
     { name: 'DATABASE_URL', configured: Boolean(env.DATABASE_URL) },
-    { name: 'ADMIN_EMAIL / ADMIN_USERNAME', configured: Boolean(env.ADMIN_EMAIL || env.ADMIN_USERNAME) },
     { name: 'ADMIN_PASSWORD_HASH', configured: Boolean(env.ADMIN_PASSWORD_HASH) },
     { name: 'ADMIN_SESSION_SECRET', configured: Boolean(env.ADMIN_SESSION_SECRET) },
     { name: 'LEAD_SESSION_SECRET', configured: Boolean(env.LEAD_SESSION_SECRET || env.ADMIN_SESSION_SECRET) },
