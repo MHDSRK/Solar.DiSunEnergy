@@ -9,7 +9,7 @@ export async function GET() {
     const sql = getSql()
 
     const leadRows = (await sql`
-      SELECT lead_id, created_at, updated_at, lead_status, name, phone, email, district, area, monthly_kwh, connection_category, recommended_kw, setup_cost, subsidy, financing_amount, customer_contribution, kseb_consumer_number, kseb_district, kseb_section, transformer, feasibility_status, requested_kw, remaining_transformer_capacity, privacy_consent, site_visit_booked_at
+      SELECT lead_id, created_at, updated_at, lead_status, name, phone, district, area, monthly_kwh, connection_category, recommended_kw, setup_cost, subsidy, financing_amount, customer_contribution, kseb_consumer_number, kseb_district, kseb_section, transformer, feasibility_status, requested_kw, remaining_transformer_capacity, privacy_consent, site_visit_booked_at
       FROM leads ORDER BY created_at DESC
     `) as unknown as Record<string, any>[]
 
