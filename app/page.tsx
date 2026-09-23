@@ -182,6 +182,7 @@ export default function Page() {
       requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: sheetRef.current.scrollHeight, behavior: 'smooth' }))
       window.setTimeout(() => {
         const calculated = calculateResult()
+        setResult(calculated)
         setIsCalculating(false)
         void (async () => {
           const saved = await updateLead({
