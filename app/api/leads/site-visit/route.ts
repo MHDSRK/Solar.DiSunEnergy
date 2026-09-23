@@ -1,12 +1,20 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
 import { notifySiteVisit } from '@/lib/notifications/leadNotifications'
 import { parseLocation, validateSiteVisitSlot } from '@/lib/siteVisitRules'
 
-function isValidDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00`))
+export function isValidCalendarDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
 }
 
 export async function POST(request: Request) {
@@ -26,7 +34,7 @@ export async function POST(request: Request) {
     if (!leadId || !leadToken || !verifyLeadToken(leadId, leadToken)) {
       return NextResponse.json({ success: false, message: 'Invalid or expired lead authorization.' }, { status: 401 })
     }
-    if (!name || !/^[6-9]\d{9}$/.test(phone) || !isValidDate(date) || !/^\d{2}:\d{2}$/.test(time) || !location) {
+    if (!name || !/^[6-9]\d{9}$/.test(phone) || !isValidCalendarDate(date) || !/^\d{2}:\d{2}$/.test(time) || !location) {
       return NextResponse.json({ success: false, message: 'Please provide valid site visit details.' }, { status: 400 })
     }
 
@@ -35,7 +43,7 @@ export async function POST(request: Request) {
 
     await ensureLeadTable()
     const sql = getSql()
-    const leadRows = await sql`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
+    const leadRows = await sql`SELECT lead_id, privacy_consent, district, area FROM leads WHERE lead_id = ${leadId} LIMIT 1`
     const lead = (leadRows as unknown as Record<string, unknown>[])[0]
     if (!lead) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
     if (lead.privacy_consent !== true) return NextResponse.json({ success: false, message: 'Terms & Privacy Policy consent is required.' }, { status: 400 })
@@ -89,7 +97,7 @@ export async function POST(request: Request) {
     ])
 
     const mergedRows = await sql`
-      SELECT l.*,
+      SELECT l.lead_id, l.name, l.phone, l.location, l.district, l.area,
         sv.name AS site_visit_name, sv.phone AS site_visit_phone,
         sv.preferred_date, sv.preferred_time, sv.location AS site_visit_location,
         sv.district AS site_visit_district, sv.locality AS site_visit_locality,
@@ -103,22 +111,28 @@ export async function POST(request: Request) {
     `
     const merged = (mergedRows as unknown as Record<string, unknown>[])[0]
     if (merged) {
-      void notifySiteVisit({
-        ...merged,
-        name: merged.site_visit_name,
-        phone: merged.site_visit_phone,
-        preferred_date: merged.preferred_date,
-        preferred_time: merged.preferred_time,
-        location: merged.site_visit_location,
-        district: merged.site_visit_district,
-        locality: merged.site_visit_locality,
-        area: merged.site_visit_area,
-        latitude: merged.latitude,
-        longitude: merged.longitude,
-        status: merged.site_visit_status,
-        created_at: merged.site_visit_created_at,
-        updated_at: merged.site_visit_updated_at,
-      }).catch((error) => console.error('Site visit notifications failed', error))
+      after(async () => {
+        try {
+          await notifySiteVisit({
+            ...merged,
+            name: merged.site_visit_name,
+            phone: merged.site_visit_phone,
+            preferred_date: merged.preferred_date,
+            preferred_time: merged.preferred_time,
+            location: merged.site_visit_location,
+            district: merged.site_visit_district,
+            locality: merged.site_visit_locality,
+            area: merged.site_visit_area,
+            latitude: merged.latitude,
+            longitude: merged.longitude,
+            status: merged.site_visit_status,
+            created_at: merged.site_visit_created_at,
+            updated_at: merged.site_visit_updated_at,
+          })
+        } catch (error) {
+          console.error('Site visit notifications failed', error)
+        }
+      })
     }
 
     return NextResponse.json({ success: true, message: 'Site visit request received. Our executive will contact you soon.' })
