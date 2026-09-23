@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { createLeadToken, verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     await getSql()`INSERT INTO leads (lead_id) VALUES (${leadId})`
 
     const lead = await getLead(leadId)
-    if (lead) void notifyLeadEvent('created', lead).catch((error) => console.error('Lead creation notifications failed', error))
+    if (lead) {\n      after(async () => {\n        try {\n          await notifyLeadEvent('created', lead)\n        } catch (error) {\n          console.error('Lead creation notifications failed', error)\n        }\n      })\n    }
 
     return NextResponse.json(
       { success: true, leadId, leadToken },
