@@ -608,11 +608,11 @@ export default function Page() {
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block text-[10px] font-medium">PREFERRED DATE
-                            <input type="date" min={new Date().toISOString().split('T')[0]} value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                            <input type="date" min={new Date().toISOString().split('T')[0]} value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 block h-10 min-w-0 w-full max-w-full box-border rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
                             {siteVisitErrors.date && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.date}</span>}
                           </label>
-                          <label className="block text-[10px] font-medium">PREFERRED TIME
-                            <input type="time" value={siteVisit.time} onChange={(event) => { setSiteVisit((current) => ({ ...current, time: event.target.value })); setSiteVisitErrors((current) => ({ ...current, time: '' })) }} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.time ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                          <label className="block min-w-0 text-[10px] font-medium">PREFERRED TIME
+                            <input type="time" value={siteVisit.time} onChange={(event) => { setSiteVisit((current) => ({ ...current, time: event.target.value })); setSiteVisitErrors((current) => ({ ...current, time: '' })) }} className={`mt-1 block h-10 min-w-0 w-full max-w-full box-border rounded-lg border ${siteVisitErrors.time ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
                             {siteVisitErrors.time && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.time}</span>}
                           </label>
                         </div>
