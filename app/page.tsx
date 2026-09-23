@@ -23,7 +23,7 @@ export default function Page() {
   const [siteVisit, setSiteVisit] = useState({ name: '', phone: '', date: '', time: '', location: '' })
   const [siteVisitErrors, setSiteVisitErrors] = useState<Record<string, string>>({})
   const [locationLoading, setLocationLoading] = useState(false)
-  const [locationMessage, setLocationMessage] = useState('')
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState(false)
   const [siteVisitMessage, setSiteVisitMessage] = useState('')
   const [siteVisitSubmitting, setSiteVisitSubmitting] = useState(false)
   const [feasibilityForm, setFeasibilityForm] = useState({ consumerNumber: '', districtId: '', districtName: '', sectionId: '', sectionOffice: '', transformerId: '', transformerName: '' })
@@ -66,21 +66,19 @@ export default function Page() {
   }, [eligibilitySubmitted])
 
   useEffect(() => {
-    if (!isEligibilityPage || siteVisit.location) return
+    if (!isEligibilityPage || siteVisit.location || !navigator.geolocation) return
     setLocationLoading(true)
-    setLocationMessage('')
-    navigator.geolocation?.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         setSiteVisit((current) => ({ ...current, location: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}` }))
         setLocationLoading(false)
       },
       () => {
         setLocationLoading(false)
-        setLocationMessage('Location access is not available. You can enable it below or enter the location manually.')
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     )
-  }, [isEligibilityPage])
+  }, [isEligibilityPage, siteVisit.location])
 
   useEffect(() => {
     if (!feasibilityResult) return
@@ -320,19 +318,19 @@ export default function Page() {
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
-      setLocationMessage('Location access is not supported by this browser. Please enter the location manually.')
+      setLocationPermissionDenied(true)
       return
     }
     setLocationLoading(true)
-    setLocationMessage('')
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setSiteVisit((current) => ({ ...current, location: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}` }))
+        setLocationPermissionDenied(false)
         setLocationLoading(false)
       },
       () => {
+        setLocationPermissionDenied(true)
         setLocationLoading(false)
-        setLocationMessage('')
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     )
@@ -637,8 +635,7 @@ export default function Page() {
                         </div>
                         <label className="block text-[10px] font-medium">EXACT LOCATION
                           <textarea value={siteVisit.location} onChange={(event) => { setSiteVisit((current) => ({ ...current, location: event.target.value })); setSiteVisitErrors((current) => ({ ...current, location: '' })) }} rows={2} placeholder={locationLoading ? 'Fetching exact location...' : 'Enter exact location'} className={`mt-1 w-full resize-none rounded-lg border ${siteVisitErrors.location ? 'border-red-500' : 'border-slate-400'} px-2 py-2 text-sm outline-none focus:border-[#159600]`} />
-                          <button type="button" onClick={requestLocation} className="mt-1 text-[9px] font-bold text-[#1260a4] underline">{locationLoading ? 'Fetching location...' : 'Use my current location'}</button>
-                          {locationMessage && <span className="mt-1 block text-[8px] text-slate-500">{locationMessage}</span>}
+                          <button type="button" onClick={requestLocation} className="mt-1 text-[9px] font-bold text-[#1260a4] underline">{locationPermissionDenied ? 'Location permission denied.' : 'Use my current location'}</button>
                           {siteVisitMessage && <span className="mt-1 block text-[9px] font-semibold text-[#1260a4]">{siteVisitMessage}</span>}
                           {siteVisitErrors.location && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.location}</span>}
                         </label>
