@@ -1,6 +1,6 @@
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { syncLeadToGoogleSheet, appendSiteVisitToGoogleSheet } from '@/lib/notifications/googleSheets'
-import { sendWhatsAppText } from '@/lib/notifications/whatsapp'
+import { sendWhatsAppLeadTemplate } from '@/lib/notifications/whatsapp'
 
 type LeadRecord = Record<string, unknown>
 
@@ -96,7 +96,7 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
 
   if (await claimNotification(eventKey, 'WHATSAPP')) {
     try {
-      results.whatsapp = await sendWhatsAppText(message)
+      results.whatsapp = await sendWhatsAppLeadTemplate(lead)
       if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
       else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
