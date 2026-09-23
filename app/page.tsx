@@ -332,7 +332,7 @@ export default function Page() {
       },
       () => {
         setLocationLoading(false)
-        setLocationMessage('Please enable location access in your browser settings, then try again.')
+        setLocationMessage('')
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     )
@@ -627,11 +627,11 @@ export default function Page() {
                         </label>
                         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
                           <label className="block min-w-0 text-[10px] font-medium">PREFERRED DATE
-                            <input type="date" min={new Date().toISOString().split('T')[0]} value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 block h-10 min-w-0 w-full max-w-full appearance-none box-border rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                            <input type="date" min={new Date().toISOString().split('T')[0]} value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`site-visit-date-time mt-1 block h-10 min-w-0 w-full max-w-full appearance-none box-border rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-center text-sm outline-none focus:border-[#159600]`} />
                             {siteVisitErrors.date && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.date}</span>}
                           </label>
                           <label className="block min-w-0 text-[10px] font-medium">PREFERRED TIME
-                            <input type="time" value={siteVisit.time} onChange={(event) => { setSiteVisit((current) => ({ ...current, time: event.target.value })); setSiteVisitErrors((current) => ({ ...current, time: '' })) }} className={`mt-1 block h-10 min-w-0 w-full max-w-full appearance-none box-border rounded-lg border ${siteVisitErrors.time ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
+                            <input type="time" value={siteVisit.time} onChange={(event) => { setSiteVisit((current) => ({ ...current, time: event.target.value })); setSiteVisitErrors((current) => ({ ...current, time: '' })) }} className={`site-visit-date-time mt-1 block h-10 min-w-0 w-full max-w-full appearance-none box-border rounded-lg border ${siteVisitErrors.time ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-center text-sm outline-none focus:border-[#159600]`} />
                             {siteVisitErrors.time && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.time}</span>}
                           </label>
                         </div>
