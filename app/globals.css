@@ -166,3 +166,16 @@
     margin: 0;
   }
 }
+
+.site-visit-date-time {
+  text-align: center;
+}
+
+.site-visit-date-time::-webkit-date-and-time-value {
+  text-align: center;
+  margin: 0 auto;
+}
+
+.site-visit-date-time::-webkit-datetime-edit {
+  text-align: center;
+}
