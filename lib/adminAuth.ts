@@ -13,8 +13,17 @@ function sign(value: string) {
   return createHmac('sha256', secret()).update(value).digest('base64url')
 }
 
-export function createSession(email: string) {
-  const payload = `${email}.${Date.now()}`
+function encodeIdentity(identity: string) {
+  return Buffer.from(identity, 'utf8').toString('base64url')
+}
+
+function decodeIdentity(encoded: string) {
+  return Buffer.from(encoded, 'base64url').toString('utf8')
+}
+
+export function createSession(identity: string) {
+  const encodedIdentity = encodeIdentity(identity)
+  const payload = `${encodedIdentity}.${Date.now()}`
   return `${payload}.${sign(payload)}`
 }
 
@@ -22,11 +31,17 @@ export function verifySession(value?: string) {
   if (!value) return false
   const parts = value.split('.')
   if (parts.length !== 3) return false
-  const [email, timestamp, signature] = parts
-  if (!email || !/^\d+$/.test(timestamp)) return false
+
+  const [encodedIdentity, timestamp, signature] = parts
+  if (!encodedIdentity || !/^\\d+$/.test(timestamp)) return false
+
+  const identity = decodeIdentity(encodedIdentity)
+  if (!identity) return false
+
   const age = Date.now() - Number(timestamp)
   if (age < 0 || age > MAX_AGE * 1000) return false
-  const expected = sign(`${email}.${timestamp}`)
+
+  const expected = sign(`${encodedIdentity}.${timestamp}`)
   try {
     return timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
   } catch {
