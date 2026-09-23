@@ -151,12 +151,12 @@ function leadRow(lead: LeadRecord) {
 }
 
 async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>>) {
-  const range = `${encodeURIComponent(config.leadSheet)}!A1:AH1`
+  const range = `${encodeURIComponent(config.leadSheet)}!A1:AI1`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
   if ((data.values?.[0]?.length ?? 0) >= LEAD_COLUMNS.length) return
   await sheetsRequest(config, `/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
-    body: JSON.stringify({ range: `${config.leadSheet}!A1:AH1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
+    body: JSON.stringify({ range: `${config.leadSheet}!A1:AI1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
   })
 }
 
@@ -178,12 +178,12 @@ export async function syncLeadToGoogleSheet(lead: LeadRecord) {
   const row = leadRow(lead)
   const existingRow = await findLeadRow(config, leadId)
   if (existingRow) {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:AH${existingRow}?valueInputOption=USER_ENTERED`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:AI${existingRow}?valueInputOption=USER_ENTERED`, {
       method: 'PUT',
-      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:Z${existingRow}`, majorDimension: 'ROWS', values: [row] }),
+      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:AI${existingRow}`, majorDimension: 'ROWS', values: [row] }),
     })
   } else {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:AH:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:AI:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
       method: 'POST',
       body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
     })
