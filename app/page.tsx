@@ -346,7 +346,7 @@ export default function Page() {
     if (!eligibilityFiles.bill) nextErrors.bill = 'Upload Latest KSEB Bill.'
     if (!eligibilityFiles.passbook) nextErrors.passbook = 'Upload Bank Passbook.'
     for (const [key, file] of Object.entries(eligibilityFiles)) {
-      if (file && file.size > 4 * 1024 * 1024) nextErrors[key] = 'Maximum file size is 4 MB.'
+      if (file && file.size > 3 * 1024 * 1024) nextErrors[key] = 'Maximum file size is 3 MB.'
     }
     setEligibilityErrors(nextErrors)
     setEligibilitySubmitError('')
@@ -365,14 +365,23 @@ export default function Page() {
         body.append('leadToken', leadToken)
         body.append('documentType', documentType)
         body.append('file', file)
-        const response = await fetch('/api/leads/documents', { method: 'POST', body })
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), 30000)
+        let response: Response
+        try {
+          response = await fetch('/api/leads/documents', { method: 'POST', body, signal: controller.signal })
+        } finally {
+          window.clearTimeout(timeoutId)
+        }
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.message || 'Unable to save one of the documents.')
       }
       setEligibilitySubmitted(true)
     } catch (error) {
       setEligibilitySubmitted(false)
-      setEligibilitySubmitError(error instanceof Error ? error.message : 'Unable to submit the documents. Please try again.')
+      setEligibilitySubmitError(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Document upload timed out. Please try again with smaller files (max 3 MB each).'
+        : error instanceof Error ? error.message : 'Unable to submit the documents. Please try again.')
     } finally {
       setEligibilitySubmitting(false)
     }
@@ -616,8 +625,8 @@ export default function Page() {
                           <input value={siteVisit.phone} onChange={(event) => { setSiteVisit((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })); setSiteVisitErrors((current) => ({ ...current, phone: '' })) }} inputMode="numeric" maxLength={10} className={`mt-1 h-10 w-full rounded-lg border ${siteVisitErrors.phone ? 'border-red-500' : 'border-slate-400'} px-2 text-sm outline-none focus:border-[#159600]`} />
                           {siteVisitErrors.phone && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.phone}</span>}
                         </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <label className="block text-[10px] font-medium">PREFERRED DATE
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                          <label className="block min-w-0 text-[10px] font-medium">PREFERRED DATE
                             <input type="date" min={new Date().toISOString().split('T')[0]} value={siteVisit.date} onChange={(event) => { setSiteVisit((current) => ({ ...current, date: event.target.value })); setSiteVisitErrors((current) => ({ ...current, date: '' })) }} className={`mt-1 block h-10 min-w-0 w-full max-w-full appearance-none box-border rounded-lg border ${siteVisitErrors.date ? 'border-red-500' : 'border-slate-400'} bg-white px-2 text-sm outline-none focus:border-[#159600]`} />
                             {siteVisitErrors.date && <span className="mt-1 block text-[9px] text-red-600">{siteVisitErrors.date}</span>}
                           </label>
