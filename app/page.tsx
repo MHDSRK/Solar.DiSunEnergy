@@ -12,6 +12,7 @@ export default function Page() {
   const [leadId, setLeadId] = useState<string | null>(null)
   const [leadToken, setLeadToken] = useState<string | null>(null)
   const [leadSaveError, setLeadSaveError] = useState('')
+  const [isCreatingLead, setIsCreatingLead] = useState(false)
   const [isFeasibilityPage, setIsFeasibilityPage] = useState(false)
   const [isEligibilityPage, setIsEligibilityPage] = useState(false)
   const [eligibilityFiles, setEligibilityFiles] = useState({ aadhaar: null as File | null, pan: null as File | null, bill: null as File | null, passbook: null as File | null })
@@ -106,19 +107,26 @@ export default function Page() {
 
   const calculateResult = () => calculateSolarResult(Number(form.bill), form.category, calculationMode)
   const createLead = async () => {
+    if (isCreatingLead) return false
+    setIsCreatingLead(true)
+    setLeadSaveError('')
     try {
-      const response = await fetch('/api/leads', { method: 'POST' })
-      const data = await response.json()
-      if (!response.ok || !data.leadId || !data.leadToken) throw new Error(data.message || 'Unable to create lead.')
+      const response = await fetch('/api/leads', { method: 'POST', cache: 'no-store' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.leadId || !data.leadToken) {
+        throw new Error(data.message || 'Unable to start the calculator (HTTP ' + response.status + ').')
+      }
       setLeadId(data.leadId)
       setLeadToken(data.leadToken)
-      setLeadSaveError('')
       return true
     } catch (error) {
       console.error('Lead creation failed', error)
       setLeadId(null)
       setLeadToken(null)
+      setLeadSaveError(error instanceof Error ? error.message : 'Unable to start the calculator. Please try again.')
       return false
+    } finally {
+      setIsCreatingLead(false)
     }
   }
 
@@ -158,8 +166,17 @@ export default function Page() {
     if (!/^[6-9]\d{9}$/.test(form.phone)) nextErrors.phone = 'Enter a valid 10-digit phone number'
     if (!form.district.trim()) nextErrors.district = 'Enter your district'
     if (!form.area.trim()) nextErrors.area = 'Enter your area'
+    if (!privacyConsent) nextErrors.consent = 'Please agree to the Privacy Policy and Terms & Conditions.'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length === 0) {
+      if (isCreatingLead) {
+        setLeadSaveError('Please wait while we start your calculator.')
+        return
+      }
+      if (!leadId || !leadToken) {
+        setLeadSaveError('Your lead session could not be created. Please close this window and tap CALCULATE NOW again.')
+        return
+      }
       setResult(null)
       setIsCalculating(true)
       requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: sheetRef.current.scrollHeight, behavior: 'smooth' }))
@@ -412,7 +429,7 @@ requestAnimationFrame(() => {
           <strong>Powerful future with SOLAR</strong>
         </p>
         <dl className="mx-auto mt-6 grid w-full max-w-[370px] grid-cols-3 divide-x divide-white/35"><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 78000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">PM SURYA GHAR<br />SUBSIDY</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 200000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">BANK LOAN<br />AVAILABLE</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Panels with<br /><span className="text-xl sm:text-2xl">30 YEARS</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">WARRANTY<br />ASSURANCE</dt></div></dl>
-        <div className="mt-auto pt-6"><p className="mb-3 text-center text-[14px] font-medium leading-[1.15] tracking-[0.01em] sm:text-lg">How much Power required<br /><span className="text-[20px] font-extrabold sm:text-2xl">for your home?</span></p><button type="button" onClick={async () => { const created = await createLead(); if (created) { setIsCalculatorOpen(true); setIsFeasibilityPage(false); setIsEligibilityPage(false); setResult(null); setFeasibilityResult(null); requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0 })) } }} className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03]">CALCULATE NOW <span className="ml-2 text-[#2e8dbe]">&gt;</span></button><p className="mt-5 text-xs text-white/90">By continuing, you agree to our <a className="underline" href="/privacy-policy">Privacy policy</a> and <a className="underline" href="/terms-of-service">Terms&amp;Conditions</a></p></div>
+        <div className="mt-auto pt-6"><p className="mb-3 text-center text-[14px] font-medium leading-[1.15] tracking-[0.01em] sm:text-lg">How much Power required<br /><span className="text-[20px] font-extrabold sm:text-2xl">for your home?</span></p><button type="button" disabled={isCreatingLead} onClick={async () => { if (isCreatingLead) return; setIsCalculatorOpen(true); setIsFeasibilityPage(false); setIsEligibilityPage(false); setResult(null); setFeasibilityResult(null); setLeadSaveError(''); requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0 })); await createLead() }} className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03] disabled:cursor-wait disabled:opacity-70">{isCreatingLead ? 'STARTING...' : 'CALCULATE NOW'} <span className="ml-2 text-[#2e8dbe]">&gt;</span></button><p className="mt-5 text-xs text-white/90">By continuing, you agree to our <a className="underline" href="/privacy-policy">Privacy policy</a> and <a className="underline" href="/terms-of-service">Terms&amp;Conditions</a></p></div>
       </section>
       {isCalculatorOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#03132f]/95 pt-[78px]" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
@@ -420,6 +437,7 @@ requestAnimationFrame(() => {
           <section ref={sheetRef} className="relative isolate h-[calc(100dvh-94px)] w-[calc(100%-24px)] overflow-x-hidden overflow-y-auto rounded-[28px] bg-white px-4 pb-3 pt-2 text-[#071528] shadow-[0_12px_32px_rgba(0,0,0,.28)] animate-in slide-in-from-bottom duration-300">
             <div className="sticky top-0 z-40 -mx-4 flex h-12 shrink-0 isolate items-center justify-between bg-white px-4 pb-1 pt-0 shadow-[0_3px_8px_rgba(7,21,40,.08)] before:absolute before:-inset-x-1 before:-top-2 before:-z-10 before:h-12 before:bg-white before:content-['']"><button type="button" onClick={() => { if (isEligibilityPage) setIsEligibilityPage(false); else if (isFeasibilityPage) setIsFeasibilityPage(false); else setIsCalculatorOpen(false) }} aria-label={isEligibilityPage ? "Back to transformer feasibility" : isFeasibilityPage ? "Back to solar calculation" : "Close calculator"} className="grid size-10 place-items-center text-3xl font-light">←</button><div className="flex items-center justify-center gap-1" aria-hidden="true"><span className="h-1 w-5 rounded-full bg-[#1260a4]" /><span className={`h-1 w-5 rounded-full ${isFeasibilityPage || isEligibilityPage ? 'bg-[#1260a4]' : 'bg-slate-300'}`} /><span className={`h-1 w-5 rounded-full ${isEligibilityPage ? 'bg-[#1260a4]' : 'bg-slate-300'}`} /></div><button type="button" onClick={() => setIsCalculatorOpen(false)} aria-label="Close calculator" className="grid size-10 place-items-center text-3xl font-light">×</button></div>
             <h2 className={`${isFeasibilityPage ? 'hidden' : ''} relative z-0 mt-2 px-2 text-center text-2xl font-extrabold leading-[1.05] tracking-[-.04em]`}>SOLAR POWER<br />CALCULATOR</h2>
+            {leadSaveError && !isFeasibilityPage && !isEligibilityPage && <div className="mx-2 mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-center text-[10px] font-semibold text-red-700">{leadSaveError}<button type="button" onClick={() => { setLeadSaveError(''); void createLead() }} disabled={isCreatingLead} className="ml-2 underline disabled:opacity-50">{isCreatingLead ? 'STARTING...' : 'RETRY'}</button></div>}
             <p className={isFeasibilityPage ? 'hidden' : 'mt-1 text-center text-[8.4px] font-bold tracking-[0.12em]'}>CALCULATION BASED ON</p>
             <div className={isFeasibilityPage ? 'hidden' : 'mt-1 grid grid-cols-2 overflow-hidden rounded-t-xl border border-slate-300 text-[9px] font-bold leading-none'}><button type="button" onClick={() => setCalculationMode('bill')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'bill' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY BILL (₹)</button><button type="button" onClick={() => setCalculationMode('units')} className={`flex min-h-11 items-center justify-center whitespace-nowrap px-2 text-center ${calculationMode === 'units' ? 'bg-[#159600] text-white' : 'bg-slate-200 text-slate-500'}`}>AVG. MONTHLY UNITS (KWH)</button></div>
             <form onSubmit={validateAndSubmit} className={isFeasibilityPage || isEligibilityPage ? 'hidden' : 'border-x border-b border-[#8bd35c] px-3 py-2'} noValidate>
@@ -614,5 +632,4 @@ requestAnimationFrame(() => {
     </main>
   )
 }
-
 
