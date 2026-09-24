@@ -5,7 +5,6 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'DiSun — Solar Power Calculator',
   description: 'DiSun Energy International solar power calculator and transformer feasibility tool.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
@@ -21,7 +20,13 @@ export const metadata: Metadata = {
         type: 'image/svg+xml',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: [
+      {
+        url: '/apple-icon.png',
+        sizes: '1024x1024',
+        type: 'image/png',
+      },
+    ],
   },
 }
 
