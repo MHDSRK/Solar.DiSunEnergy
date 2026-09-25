@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { notifyLeadEvent, notifySiteVisit } from '@/lib/notifications/leadNotifications'
+import { auditEvent } from '@/lib/adminAudit'
 
 const allowedEvents = new Set(['created', 'calculator', 'feasibility', 'documents', 'site_visit'])
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin()
+    const actor = await requireAdmin()
     await ensureLeadTable()
     const body = await request.json()
     const leadId = String(body.leadId ?? '').trim()
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
     const result = event === 'site_visit' ? await notifySiteVisit(lead) : await notifyLeadEvent(event, lead)
     await getSql().query(
       "INSERT INTO admin_audit_logs (action, lead_id, details) VALUES ('NOTIFICATION_RETRY', $1, $2::jsonb)",
-      [leadId, JSON.stringify({ event })],
+      [leadId, JSON.stringify({ event, changedBy: actor.email })],
     )
+    await auditEvent(leadId, 'notification_retry', event + ' by ' + actor.name, actor)
     return NextResponse.json({ success: true, result })
   } catch (error) {
     const unauthorized = error instanceof Error && error.message === 'UNAUTHORIZED'
