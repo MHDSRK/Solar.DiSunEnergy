@@ -4,30 +4,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'DiSun — Solar Power Calculator',
-  description: 'DiSun Energy International solar power calculator and transformer feasibility tool.',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: [
-      {
-        url: '/apple-icon.png',
-        sizes: '1024x1024',
-        type: 'image/png',
-      },
-    ],
-  },
+  description: 'DiSun Energy International solar power calculator and transformer feasibility tool.'
 }
 
 export const viewport: Viewport = {
