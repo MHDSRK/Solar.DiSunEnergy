@@ -10,14 +10,14 @@ function unauthorized(e:unknown){return e instanceof Error&&e.message==='UNAUTHO
 export async function GET(){
  try{
   await requireAdmin(); await ensureLeadTable(); const sql=getSql()
-  const leads=await sql`SELECT * FROM leads ORDER BY created_at DESC`
-  const audit=await sql`SELECT * FROM lead_audit_log ORDER BY changed_at DESC`
-  const followups=await sql`SELECT * FROM lead_followups ORDER BY follow_up_at ASC`
-  const payments=await sql`SELECT * FROM lead_payments ORDER BY paid_at DESC`
-  const stages=await sql`SELECT * FROM lead_project_stages ORDER BY stage_at ASC`
-  const docs=await sql`SELECT lead_id,document_type,file_name,mime_type,size_bytes,uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`
-  const visits=await sql`SELECT * FROM site_visits ORDER BY created_at DESC`
-  return NextResponse.json({success:true,leads,audit,followups,payments,stages,documents:docs,siteVisits:visits,stats:{total:leads.length,contact:leads.filter((x:any)=>x.name||x.phone).length,calculated:leads.filter((x:any)=>x.recommended_kw!=null).length,feasibility:leads.filter((x:any)=>x.feasibility_status!=null).length}})
+  const leads=(await sql`SELECT * FROM leads ORDER BY created_at DESC`) as Record<string,any>[]
+  const audit=(await sql`SELECT * FROM lead_audit_log ORDER BY changed_at DESC`) as Record<string,any>[]
+  const followups=(await sql`SELECT * FROM lead_followups ORDER BY follow_up_at ASC`) as Record<string,any>[]
+  const payments=(await sql`SELECT * FROM lead_payments ORDER BY paid_at DESC`) as Record<string,any>[]
+  const stages=(await sql`SELECT * FROM lead_project_stages ORDER BY stage_at ASC`) as Record<string,any>[]
+  const docs=(await sql`SELECT lead_id,document_type,file_name,mime_type,size_bytes,uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`) as Record<string,any>[]
+  const visits=(await sql`SELECT * FROM site_visits ORDER BY created_at DESC`) as Record<string,any>[]
+  return NextResponse.json({success:true,leads,audit,followups,payments,stages,documents:docs,siteVisits:visits,stats:{total:leads.length,contact:leads.filter((x)=>x.name||x.phone).length,calculated:leads.filter((x)=>x.recommended_kw!=null).length,feasibility:leads.filter((x)=>x.feasibility_status!=null).length}})
  }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to load leads.'},{status:unauthorized(e)?401:500})}
 }
 export async function POST(request:Request){
@@ -35,8 +35,8 @@ export async function DELETE(request:Request){
  try{
   const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json(); const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
   if(!ids.length) return NextResponse.json({success:false,message:'No leads selected.'},{status:400})
-  const rows=await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`
-  for(const row of rows as any[]) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
+  const rows=(await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`) as Record<string,any>[]
+  for(const row of rows) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
   await getSql()`DELETE FROM leads WHERE lead_id = ANY(${ids}::text[])`
   return NextResponse.json({success:true,deleted:ids.length})
  }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to delete leads.'},{status:unauthorized(e)?401:500})}
