@@ -18,9 +18,21 @@ export async function POST(request: Request) {
     if (!process.env.ADMIN_SESSION_SECRET || !accounts.some((account: any) => account.passwordHash)) {
       return NextResponse.json({ success: false, message: 'Admin authentication is not configured.' }, { status: 500 })
     }
-    const account = accounts.find((candidate: any) => !loginEmail || String(candidate.email).toLowerCase() === loginEmail)
-    const validPassword = account ? await verifyAdminPassword(password, String(account.passwordHash)) : false
-    if (!validPassword) {
+    // The current admin form intentionally supports password-only login. Passwords must
+    // be unique across accounts so the verified hash identifies the acting partner.
+    let account: any = null
+    if (loginEmail) {
+      const candidate = accounts.find((entry: any) => String(entry.email).toLowerCase() === loginEmail)
+      if (candidate && await verifyAdminPassword(password, String(candidate.passwordHash))) account = candidate
+    } else {
+      for (const candidate of accounts) {
+        if (await verifyAdminPassword(password, String(candidate.passwordHash))) {
+          account = candidate
+          break
+        }
+      }
+    }
+    if (!account) {
       return NextResponse.json({ success: false, message: 'Invalid password.' }, { status: 401 })
     }
 

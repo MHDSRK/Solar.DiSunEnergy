@@ -11,9 +11,4 @@ export async function auditLeadChanges(leadId: string, before: Record<string, un
   }
 }
 
-export async function getLeadOrNull(leadId: string) {
-  const rows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
-  return (rows as unknown as Record<string, unknown>[])[0] ?? null
-}
-
 export { ensureAdminTables }

@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState('')
   const [leads, setLeads] = useState<Lead[]>([])
   const [stats, setStats] = useState({ total: 0, contact: 0, calculated: 0, feasibility: 0 })
+  const [dueFollowups, setDueFollowups] = useState<any[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [detail, setDetail] = useState<Lead | null>(null)
   const [busy, setBusy] = useState(false)
@@ -31,6 +32,7 @@ export default function AdminPage() {
       if (!response.ok) throw new Error(data.message || 'Unable to load leads.')
       setLeads(data.leads ?? [])
       setStats(data.stats ?? { total: 0, contact: 0, calculated: 0, feasibility: 0 })
+      setDueFollowups(data.dueFollowups ?? [])
       setSelected([])
       setAuthenticated(true)
     } catch (error) {
@@ -117,6 +119,7 @@ export default function AdminPage() {
           <div className="flex gap-2"><button onClick={load} className="rounded-full border-2 border-[#1260a4] px-4 py-2 text-xs font-extrabold text-[#1260a4]">REFRESH</button><button onClick={logout} className="rounded-full bg-[#1260a4] px-4 py-2 text-xs font-extrabold text-white">LOGOUT</button></div>
         </header>
         {message && <div className="mb-4 rounded-xl bg-white px-4 py-3 text-xs font-semibold text-[#1260a4]">{message}</div>}
+        {dueFollowups.length > 0 && <section className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[#071528] shadow-[0_6px_18px_rgba(0,0,0,.12)]"><h2 className="text-sm font-extrabold text-amber-900">Follow-ups due</h2><div className="mt-2 grid gap-2">{dueFollowups.map((followup) => <button key={followup.id} onClick={() => { const lead = leads.find((item) => item.lead_id === followup.lead_id); if (lead) setDetail(lead) }} className="flex min-h-11 items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs"><span><strong>{followup.lead_id}</strong>{followup.note ? ` — ${followup.note}` : ''}</span><span className="text-amber-800">{dateFmt(followup.follow_up_at)}</span></button>)}</div></section>}
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[[stats.total,'TOTAL LEADS'],[stats.contact,'CONTACT DETAILS'],[stats.calculated,'CALCULATED LEADS'],[stats.feasibility,'FEASIBILITY CHECKED']].map(([n,l])=><div key={String(l)} className="rounded-2xl bg-white p-4 shadow-[0_6px_18px_rgba(0,0,0,.12)]"><p className="text-2xl font-extrabold text-[#1260a4]">{n}</p><p className="mt-1 text-[9px] font-bold tracking-wide text-slate-500">{l}</p></div>)}
         </section>

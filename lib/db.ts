@@ -2,8 +2,11 @@ import { neon } from '@neondatabase/serverless'
 
 let sqlClient: ReturnType<typeof neon> | null = null
 let leadTablePromise: Promise<void> | null = null
+let adminTablesPromise: Promise<void> | null = null
 
 export async function ensureAdminTables() {
+  if (adminTablesPromise) return adminTablesPromise
+  adminTablesPromise = (async () => {
   await ensureLeadTable()
   const sql = getSql()
   await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'web'`
@@ -13,6 +16,13 @@ export async function ensureAdminTables() {
   await sql`CREATE INDEX IF NOT EXISTS lead_followups_due_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING'`
   await sql`CREATE TABLE IF NOT EXISTS lead_payments (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, amount NUMERIC(12,2) NOT NULL, paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), method TEXT, note TEXT, recorded_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`
   await sql`CREATE TABLE IF NOT EXISTS lead_project_stages (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, stage TEXT NOT NULL, note TEXT, stage_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), recorded_by_name TEXT NOT NULL)`
+  })()
+  try {
+    await adminTablesPromise
+  } catch (error) {
+    adminTablesPromise = null
+    throw error
+  }
 }
 
 export function getSql() {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ensureLeadTable, getSql } from '@/lib/db'
+import { ensureAdminTables, ensureLeadTable, getSql } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
 
 export async function GET() {
@@ -7,6 +7,7 @@ export async function GET() {
     await requireAdmin()
     await ensureLeadTable()
     const sql = getSql()
+    await ensureAdminTables()
     const transactionResult = await sql.transaction([
       sql`SELECT lead_id, created_at, updated_at, lead_status, name, phone, email, district, area, monthly_kwh, connection_category, recommended_kw, setup_cost, subsidy, financing_amount, customer_contribution, kseb_consumer_number, kseb_district, kseb_section, transformer, feasibility_status, requested_kw, remaining_transformer_capacity, privacy_consent, site_visit_booked_at FROM leads ORDER BY created_at DESC`,
       sql`SELECT lead_id, document_type, file_name, mime_type, size_bytes, uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`,
@@ -42,7 +43,8 @@ export async function GET() {
       calculated: leads.filter((x: any) => x.recommended_kw !== null).length,
       feasibility: leads.filter((x: any) => x.feasibility_status !== null).length,
     }
-    return NextResponse.json({ success: true, leads, stats })
+    const dueFollowups = await sql`SELECT id, lead_id, note, follow_up_at, created_by_name FROM lead_followups WHERE status = 'PENDING' AND follow_up_at <= NOW() + INTERVAL '1 day' ORDER BY follow_up_at ASC LIMIT 50`
+    return NextResponse.json({ success: true, leads, stats, dueFollowups })
   } catch (error) {
     const unauthorized = error instanceof Error && error.message === 'UNAUTHORIZED'
     if (!unauthorized) console.error('Admin leads load failed', error)
@@ -52,7 +54,7 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
     await ensureLeadTable()
     const body = await request.json().catch(() => ({}))
     const sql = getSql()
@@ -61,7 +63,7 @@ export async function DELETE(request: Request) {
       if (body.confirmation !== 'DELETE ALL') return NextResponse.json({ success: false, message: 'Type DELETE ALL to confirm.' }, { status: 400 })
       await sql.transaction([
         sql`DELETE FROM leads`,
-        sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ all: true })}::jsonb)`,
+        sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ all: true, changedBy: { name: admin.name, email: admin.email } })}::jsonb)`,
       ])
       return NextResponse.json({ success: true })
     }
@@ -72,7 +74,7 @@ export async function DELETE(request: Request) {
     const idArray = ids
     await sql.transaction([
       sql`DELETE FROM leads WHERE lead_id = ANY(${idArray}::text[])`,
-      sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ leadIds: ids })}::jsonb)`,
+      sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ leadIds: ids, changedBy: { name: admin.name, email: admin.email } })}::jsonb)`,
     ])
     return NextResponse.json({ success: true, deleted: ids.length })
   } catch (error) {
