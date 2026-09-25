@@ -9,7 +9,7 @@ export async function GET() {
     const sql = getSql()
     await ensureAdminTables()
     const transactionResult = await sql.transaction([
-      sql`SELECT lead_id, created_at, updated_at, lead_status, name, phone, email, district, area, monthly_kwh, connection_category, recommended_kw, setup_cost, subsidy, financing_amount, customer_contribution, kseb_consumer_number, kseb_district, kseb_section, transformer, feasibility_status, requested_kw, remaining_transformer_capacity, privacy_consent, site_visit_booked_at FROM leads ORDER BY created_at DESC`,
+      sql`SELECT lead_id, created_at, updated_at, lead_status, name, phone, district, area, monthly_kwh, connection_category, recommended_kw, setup_cost, subsidy, financing_amount, customer_contribution, kseb_consumer_number, kseb_district, kseb_section, transformer, feasibility_status, requested_kw, remaining_transformer_capacity, privacy_consent, site_visit_booked_at FROM leads ORDER BY created_at DESC`,
       sql`SELECT lead_id, document_type, file_name, mime_type, size_bytes, uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`,
       sql`SELECT lead_id, name, phone, preferred_date, preferred_time, location, district, locality, area, latitude, longitude, status, created_at, updated_at FROM site_visits ORDER BY created_at DESC`,
       sql`SELECT event_key, channel, status, attempts, last_error, updated_at FROM notification_events ORDER BY updated_at DESC`,
