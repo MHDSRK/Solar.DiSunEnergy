@@ -1,137 +1,22 @@
 'use client'
-
-import { useEffect, useMemo, useState } from 'react'
-
-type Lead = Record<string, any>
-
-const fmt = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value)
-const dateFmt = (value: unknown) => value ? new Date(String(value)).toLocaleString('en-IN') : '—'
-
-export default function AdminPage() {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [password, setPassword] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [stats, setStats] = useState({ total: 0, contact: 0, calculated: 0, feasibility: 0 })
-  const [selected, setSelected] = useState<string[]>([])
-  const [detail, setDetail] = useState<Lead | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  const [retrying, setRetrying] = useState('')
-
-  const load = async () => {
-    setBusy(true); setMessage('')
-    try {
-      const response = await fetch('/api/admin/leads', { cache: 'no-store' })
-      const data = await response.json().catch(() => ({}))
-      if (response.status === 401) {
-        setAuthenticated(false)
-        return
-      }
-      if (!response.ok) throw new Error(data.message || 'Unable to load leads.')
-      setLeads(data.leads ?? [])
-      setStats(data.stats ?? { total: 0, contact: 0, calculated: 0, feasibility: 0 })
-      setSelected([])
-      setAuthenticated(true)
-    } catch (error) {
-      console.error('Admin lead load failed', error)
-      setMessage(error instanceof Error ? error.message : 'Unable to load leads.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  useEffect(() => { fetch('/api/admin/session').then(r => { setAuthenticated(r.ok); if (r.ok) load() }) }, [])
-
-  const allSelected = leads.length > 0 && selected.length === leads.length
-  const selectedCount = selected.length
-  const toggleAll = () => setSelected(allSelected ? [] : leads.map(x => x.lead_id))
-  const toggle = (id: string) => setSelected(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
-
-  const deleteSelected = async () => {
-    if (!selectedCount) return
-    if (!window.confirm(`Delete ${selectedCount} selected lead(s)? This cannot be undone.`)) return
-    setBusy(true)
-    const r = await fetch('/api/admin/leads', { method: 'DELETE', headers: {'content-type':'application/json'}, body: JSON.stringify({ leadIds: selected }) })
-    const d = await r.json()
-    setMessage(d.message ?? (r.ok ? 'Selected leads deleted.' : 'Delete failed.'))
-    await load()
-  }
-
-  const deleteAll = async () => {
-    const confirmation = window.prompt('This permanently deletes ALL leads. Type DELETE ALL to continue.')
-    if (confirmation !== 'DELETE ALL') return
-    setBusy(true)
-    const r = await fetch('/api/admin/leads', { method: 'DELETE', headers: {'content-type':'application/json'}, body: JSON.stringify({ all: true, confirmation }) })
-    const d = await r.json()
-    setMessage(d.message ?? (r.ok ? 'All leads deleted.' : 'Delete failed.'))
-    await load()
-  }
-
-  const deleteOne = async () => {
-    if (!detail) return
-    if (!window.confirm(`Delete lead ${detail.lead_id}? This cannot be undone.`)) return
-    setBusy(true)
-    const r = await fetch('/api/admin/leads', { method: 'DELETE', headers: {'content-type':'application/json'}, body: JSON.stringify({ leadIds: [detail.lead_id] }) })
-    const d = await r.json()
-    setDetail(null); setMessage(d.message ?? (r.ok ? 'Lead deleted.' : 'Delete failed.')); await load()
-  }
-
-  const retryNotification = async (leadId: string, event: string) => {
-    setRetrying(leadId + ':' + event)
-    try {
-      const response = await fetch('/api/admin/notifications/retry', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ leadId, event }) })
-      const data = await response.json().catch(() => ({}))
-      setMessage(data.message ?? (response.ok ? 'Notification retry completed.' : 'Notification retry failed.'))
-      await load()
-      if (detail?.lead_id === leadId) {
-        setDetail((current) => current ? { ...current, notifications: current.notifications } : current)
-      }
-    } finally { setRetrying('') }
-  }
-
-  const logout = async () => { await fetch('/api/admin/logout', { method: 'POST' }); setAuthenticated(false); setLeads([]); setDetail(null) }
-
-  if (authenticated === null) return <div className="min-h-dvh bg-[#03132f] grid place-items-center text-white">Loading…</div>
-
-  if (!authenticated) return (
-    <main className="min-h-dvh bg-[#03132f] grid place-items-center p-5">
-      <div className="w-full max-w-sm rounded-[28px] bg-white p-6 text-[#071528] shadow-[0_12px_32px_rgba(0,0,0,.28)]">
-        <div className="mx-auto h-12 w-16 overflow-hidden rounded-xl bg-white"><img src={`https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Image-B6267883-BYNKz4nIws4F3XvdcZk2uddggsWgeT.jpeg`} alt="DiSun" className="h-full w-full object-cover" /></div>
-        <h1 className="mt-5 text-center text-2xl font-extrabold">ADMIN LOGIN</h1>
-        <p className="mt-1 text-center text-[10px] text-slate-500">DiSun Energy International</p>
-        <form noValidate className="mt-6 space-y-3" onSubmit={async e => { e.preventDefault(); setLoginError(''); const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})}); const d=await r.json().catch(() => ({})); if(!r.ok){setLoginError(d.message||'Login failed.');return} setAuthenticated(true); await load() }}>
-          <label className="block text-[10px] font-medium">PASSWORD<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" placeholder="Enter admin password" className="mt-1 h-10 w-full rounded-lg border border-slate-400 px-2 text-sm outline-none focus:border-[#159600]" /></label>
-          {loginError && <p className="text-[9px] text-red-600">{loginError}</p>}
-          <button className="mt-2 flex min-h-11 w-full items-center justify-center rounded-full bg-[#1260a4] text-sm font-extrabold tracking-[.08em] text-white">LOGIN</button>
-        </form>
-      </div>
-    </main>
-  )
-
-  return (
-    <main className="min-h-dvh bg-[#03132f] p-4 text-[#071528] sm:p-6">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[24px] bg-white px-4 py-3 shadow-[0_8px_20px_rgba(0,0,0,.2)]">
-          <div><h1 className="text-xl font-extrabold text-[#1260a4]">DiSun ADMIN</h1><p className="text-[10px] text-slate-500">Lead Management</p></div>
-          <div className="flex gap-2"><button onClick={load} className="rounded-full border-2 border-[#1260a4] px-4 py-2 text-xs font-extrabold text-[#1260a4]">REFRESH</button><button onClick={logout} className="rounded-full bg-[#1260a4] px-4 py-2 text-xs font-extrabold text-white">LOGOUT</button></div>
-        </header>
-        {message && <div className="mb-4 rounded-xl bg-white px-4 py-3 text-xs font-semibold text-[#1260a4]">{message}</div>}
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[[stats.total,'TOTAL LEADS'],[stats.contact,'CONTACT DETAILS'],[stats.calculated,'CALCULATED LEADS'],[stats.feasibility,'FEASIBILITY CHECKED']].map(([n,l])=><div key={String(l)} className="rounded-2xl bg-white p-4 shadow-[0_6px_18px_rgba(0,0,0,.12)]"><p className="text-2xl font-extrabold text-[#1260a4]">{n}</p><p className="mt-1 text-[9px] font-bold tracking-wide text-slate-500">{l}</p></div>)}
-        </section>
-        <section className="mt-4 overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(0,0,0,.15)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-3">
-            <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={allSelected} onChange={toggleAll} /> Select All</label>
-            <div className="flex gap-2"><button disabled={!selectedCount} onClick={deleteSelected} className="rounded-full border border-red-500 px-3 py-2 text-[10px] font-extrabold text-red-600 disabled:opacity-40">🗑 DELETE SELECTED ({selectedCount})</button><button onClick={deleteAll} className="rounded-full bg-red-600 px-3 py-2 text-[10px] font-extrabold text-white">🗑 DELETE ALL</button></div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-xs"><thead className="bg-[#f2f7fb] text-[9px] uppercase tracking-wide text-slate-500"><tr><th className="p-3"></th><th className="p-3">Date/Time</th><th className="p-3">Lead ID</th><th className="p-3">Name</th><th className="p-3">Phone</th><th className="p-3">District</th><th className="p-3">Category</th><th className="p-3">Consumption</th><th className="p-3">Solar</th><th className="p-3">Transformer</th><th className="p-3">Status</th></tr></thead><tbody>{leads.map(lead=><tr key={lead.lead_id} onClick={()=>setDetail(lead)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"><td className="p-3" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selected.includes(lead.lead_id)} onChange={()=>toggle(lead.lead_id)} /></td><td className="p-3">{dateFmt(lead.created_at)}</td><td className="p-3 font-bold text-[#1260a4]">{lead.lead_id}</td><td className="p-3">{fmt(lead.name)}</td><td className="p-3">{fmt(lead.phone)}</td><td className="p-3">{fmt(lead.district)}</td><td className="p-3">{fmt(lead.connection_category)}</td><td className="p-3">{lead.monthly_kwh !== null ? `${lead.monthly_kwh} kWh` : lead.bill !== null ? `₹ ${lead.bill}` : '—'}</td><td className="p-3">{lead.recommended_kw !== null ? `${lead.recommended_kw} kW` : '—'}</td><td className="p-3">{fmt(lead.transformer)}</td><td className="p-3 font-semibold">{fmt(lead.lead_status ?? (lead.feasibility_status ?? (lead.recommended_kw !== null ? 'CALCULATED' : 'NEW')))}</td></tr>)}</tbody></table>
-          </div>
-          {!leads.length && <div className="p-10 text-center text-sm text-slate-500">{busy ? 'Loading…' : 'No leads yet.'}</div>}
-        </section>
-        {detail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#03132f]/70 p-4" onClick={()=>setDetail(null)}><aside className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white p-5 text-[#071528] shadow-2xl" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold text-[#1260a4]">{detail.lead_id}</h2><button onClick={()=>setDetail(null)} className="text-3xl font-light">×</button></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs">{Object.entries(detail).filter(([key])=>key !== 'documents' && key !== 'site_visit' && key !== 'notifications').map(([key,value])=><div key={key} className="rounded-xl bg-slate-50 p-3"><p className="text-[8px] font-bold uppercase text-slate-400">{key.replaceAll('_',' ')}</p><p className="mt-1 break-words font-semibold">{fmt(value)}</p></div>)}</div>{Array.isArray(detail.documents) && detail.documents.length > 0 && <section className="mt-4 rounded-2xl border border-slate-200 p-3"><h3 className="text-xs font-extrabold text-[#1260a4]">ELIGIBILITY DOCUMENTS</h3><div className="mt-2 grid gap-2">{detail.documents.map((doc: any)=><a key={doc.document_type} href={'/api/admin/documents?leadId='+encodeURIComponent(detail.lead_id)+'&documentType='+encodeURIComponent(doc.document_type)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold"><span>{doc.document_type.toUpperCase()} — {doc.file_name}</span><span className="text-[#1260a4]">VIEW</span></a>)}</div></section>}{Array.isArray(detail.notifications) && detail.notifications.length > 0 && <section className="mt-4 rounded-2xl border border-slate-200 p-3"><h3 className="text-xs font-extrabold text-[#1260a4]">NOTIFICATIONS</h3><div className="mt-2 grid gap-2">{detail.notifications.map((notification: any)=><div key={notification.event_key+'-'+notification.channel} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px]"><div><p className="font-bold">{notification.channel}</p><p className="text-slate-500">{notification.event_key.split(':').slice(1).join(':')} · {notification.status} · {notification.attempts} attempt(s)</p>{notification.last_error && <p className="mt-1 text-red-600">{notification.last_error}</p>}</div>{notification.status !== 'SENT' && <button disabled={retrying===detail.lead_id+':'+(notification.event_key.endsWith(':SITE_VISIT_SHEET') ? 'site_visit' : notification.event_key.split(':').slice(1).join(':').toLowerCase())} onClick={()=>retryNotification(detail.lead_id, notification.event_key.endsWith(':SITE_VISIT_SHEET') ? 'site_visit' : notification.event_key.split(':').slice(1).join(':').toLowerCase())} className="shrink-0 rounded-full border border-[#1260a4] px-3 py-1 font-bold text-[#1260a4] disabled:opacity-50">RETRY</button>}</div>)}</div></section>}{detail.site_visit && <section className="mt-4 rounded-2xl border border-slate-200 p-3"><h3 className="text-xs font-extrabold text-[#1260a4]">SITE VISIT</h3><div className="mt-2 grid grid-cols-2 gap-2 text-xs">{Object.entries(detail.site_visit).filter(([key])=>key !== 'lead_id').map(([key,value])=><div key={key} className="rounded-xl bg-slate-50 p-2"><p className="text-[8px] font-bold uppercase text-slate-400">{key.replaceAll('_',' ')}</p><p className="mt-1 break-words font-semibold">{fmt(value)}</p></div>)}</div></section>}<button onClick={deleteOne} className="mt-5 w-full rounded-full bg-red-600 py-3 text-xs font-extrabold text-white">🗑 DELETE LEAD</button></aside></div>}
-      </div>
-    </main>
-  )
-}
+import{useEffect,useState}from'react'
+type L=Record<string,any>
+const dt=(v:any)=>v?new Date(v).toLocaleString('en-IN'):'—'
+export default function Admin(){
+ const[session,setSession]=useState<any>(null),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[err,setErr]=useState(''),[leads,setLeads]=useState<L[]>([]),[audit,setAudit]=useState<L[]>([]),[followups,setFollowups]=useState<L[]>([]),[payments,setPayments]=useState<L[]>([]),[stages,setStages]=useState<L[]>([]),[selected,setSelected]=useState<L|null>(null),[tab,setTab]=useState('LEADS'),[form,setForm]=useState({name:'',phone:'',district:'',area:'',bill:'',connection_category:'Domestic'}),[notice,setNotice]=useState('')
+ const load=async()=>{const r=await fetch('/api/admin/leads',{cache:'no-store'});const d=await r.json();if(r.ok){setLeads(d.leads||[]);setAudit(d.audit||[]);setFollowups(d.followups||[]);setPayments(d.payments||[]);setStages(d.stages||[])}} 
+ useEffect(()=>{fetch('/api/admin/session').then(async r=>{const d=await r.json();setSession(d);if(d.authenticated)load()})},[])
+ const login=async(e:any)=>{e.preventDefault();const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok){setErr(d.message||'Login failed');return}setSession(d);load()}
+ if(session===null)return <main className="min-h-dvh grid place-items-center bg-[#03132f] text-white">Loading…</main>
+ if(!session.authenticated)return <main className="min-h-dvh grid place-items-center bg-[#03132f] p-5"><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-6 text-[#071528]"><h1 className="text-2xl font-black text-[#1260a4]">DiSun ADMIN v2</h1><input required type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-5 w-full rounded-xl border p-3"/><input required type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className="mt-3 w-full rounded-xl border p-3"/>{err&&<p className="mt-2 text-xs text-red-600">{err}</p>}<button className="mt-4 w-full rounded-full bg-[#1260a4] p-3 font-bold text-white">LOGIN</button></form></main>
+ const create=async(e:any)=>{e.preventDefault();const r=await fetch('/api/admin/leads',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(form)});const d=await r.json();setNotice(d.message|| (r.ok?'Lead created':'Failed'));if(r.ok){setForm({name:'',phone:'',district:'',area:'',bill:'',connection_category:'Domestic'});load()}}
+ return <main className="min-h-dvh bg-[#03132f] p-3 text-[#071528] sm:p-6"><div className="mx-auto max-w-7xl"><header className="flex flex-wrap items-center justify-between rounded-2xl bg-white p-4"><div><h1 className="text-xl font-black text-[#1260a4]">DiSun ADMIN v2</h1><p className="text-xs text-slate-500">Logged in as <b>{session.name}</b> · {session.email}</p></div><button onClick={async()=>{await fetch('/api/admin/logout',{method:'POST'});location.reload()}} className="rounded-full bg-[#1260a4] px-4 py-2 text-xs font-bold text-white">LOGOUT</button></header>
+ <nav className="my-3 flex gap-2">{['LEADS','NEW LEAD','HISTORY','FOLLOWUPS','PAYMENTS','PROJECT'].map(x=><button key={x} onClick={()=>setTab(x)} className={`rounded-full px-4 py-2 text-xs font-bold ${tab===x?'bg-[#1260a4] text-white':'bg-white'}`}>{x}</button>)}</nav>{notice&&<div className="mb-3 rounded-xl bg-white p-3 text-xs">{notice}</div>}
+ {tab==='NEW LEAD'&&<form onSubmit={create} className="grid max-w-2xl gap-3 rounded-2xl bg-white p-5 md:grid-cols-2">{Object.entries(form).map(([k,v])=>k==='connection_category'?<select key={k} value={String(v)} onChange={e=>setForm({...form,[k]:e.target.value})} className="rounded-xl border p-3"><option>Domestic</option><option>Commercial</option></select>:<input key={k} required={['name','phone','district'].includes(k)} placeholder={k.replaceAll('_',' ')} value={String(v)} onChange={e=>setForm({...form,[k]:e.target.value})} className="rounded-xl border p-3"/>)}<button className="rounded-full bg-[#1260a4] p-3 font-bold text-white md:col-span-2">CREATE LEAD</button></form>}
+ {tab==='LEADS'&&<div className="overflow-x-auto rounded-2xl bg-white"><table className="w-full min-w-[850px] text-xs"><thead className="bg-slate-100"><tr>{['Date','Lead','Name','Phone','Source','Status','Stage','Paid'].map(x=><th className="p-3 text-left" key={x}>{x}</th>)}</tr></thead><tbody>{leads.map(l=>{const paid=payments.filter(p=>p.lead_id===l.lead_id).reduce((n,p)=>n+Number(p.amount),0);const st=stages.filter(s=>s.lead_id===l.lead_id).at(-1)?.stage||'—';return <tr key={l.lead_id} onClick={()=>setSelected(l)} className="cursor-pointer border-t hover:bg-slate-50"><td className="p-3">{dt(l.created_at)}</td><td className="p-3 font-bold text-[#1260a4]">{l.lead_id}</td><td className="p-3">{l.name||'—'}</td><td className="p-3">{l.phone||'—'}</td><td className="p-3">{l.source||'web'}</td><td className="p-3">{l.lead_status||'NEW'}</td><td className="p-3">{st}</td><td className="p-3">₹{paid.toLocaleString('en-IN')}</td></tr>})}</tbody></table></div>}
+ {tab==='HISTORY'&&<Log rows={audit}/>}
+ {tab==='FOLLOWUPS'&&<Log rows={followups}/>}
+ {tab==='PAYMENTS'&&<Log rows={payments}/>}
+ {tab==='PROJECT'&&<Log rows={stages}/>}
+ {selected&&<aside className="fixed inset-0 z-50 overflow-auto bg-black/60 p-4"><div className="mx-auto max-w-3xl rounded-3xl bg-white p-5"><div className="flex justify-between"><h2 className="font-black text-[#1260a4]">{selected.lead_id}</h2><button onClick={()=>setSelected(null)}>✕</button></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs">{Object.entries(selected).filter(([k])=>!['documents','notifications','site_visit'].includes(k)).map(([k,v])=><div className="rounded-xl bg-slate-50 p-3" key={k}><small className="uppercase text-slate-400">{k.replaceAll('_',' ')}</small><div className="font-bold">{String(v??'—')}</div></div>)}</div><details className="mt-4 rounded-xl border p-3" open><summary className="font-bold">History</summary><Log rows={audit.filter(x=>x.lead_id===selected.lead_id)}/></details></div></aside>}</div></main>}
+function Log({rows}:{rows:L[]}){return <div className="rounded-2xl bg-white p-4">{rows.length?rows.map((x:any)=><div key={x.id||JSON.stringify(x)} className="border-b py-2 text-xs">{Object.entries(x).map(([k,v])=><span key={k} className="mr-3"><b>{k}:</b> {String(v??'—')}</span>)}</div>):<p className="text-slate-500">No records.</p>}</div>}
