@@ -68,3 +68,23 @@ export async function sendWhatsAppLeadTemplate(lead: Record<string, unknown>): P
   try { data = JSON.parse(details) as typeof data } catch {}
   return { configured: true, sent: true, messageId: data.messages?.[0]?.id }
 }
+
+
+export async function sendWhatsAppFollowupReminder(followup: Record<string, unknown>): Promise<WhatsAppResult> {
+  const current = config()
+  if (!current) return { configured: false, sent: false }
+  const templateName = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME?.trim() || 'disun_followup_reminder'
+  const templateLanguage = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE?.trim() || 'en_US'
+  const response = await fetch(`https://graph.facebook.com/${current.version}/${current.phoneNumberId}/messages`, {
+    method: 'POST', headers: { Authorization: `Bearer ${current.accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product:'whatsapp', recipient_type:'individual', to:recipient(), type:'template', template:{name:templateName,language:{code:templateLanguage},components:[{type:'body',parameters:[
+      {type:'text',text:format(followup.name)},
+      {type:'text',text:format(followup.follow_up_at)},
+      {type:'text',text:format(followup.note)},
+    ]}]}}), cache:'no-store'
+  })
+  const details=await response.text()
+  if(!response.ok) throw new Error(`WhatsApp follow-up reminder failed (${response.status}): ${details.slice(0,1000)}`)
+  let data:{messages?:Array<{id?:string}>}={}; try{data=JSON.parse(details) as typeof data}catch{}
+  return {configured:true,sent:true,messageId:data.messages?.[0]?.id}
+}
