@@ -3,6 +3,18 @@ import { neon } from '@neondatabase/serverless'
 let sqlClient: ReturnType<typeof neon> | null = null
 let leadTablePromise: Promise<void> | null = null
 
+export async function ensureAdminTables() {
+  await ensureLeadTable()
+  const sql = getSql()
+  await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'web'`
+  await sql`CREATE TABLE IF NOT EXISTS lead_audit_log (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, field TEXT NOT NULL, old_value TEXT, new_value TEXT, changed_by_name TEXT NOT NULL, changed_by_email TEXT NOT NULL, changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`
+  await sql`CREATE INDEX IF NOT EXISTS lead_audit_log_lead_id_idx ON lead_audit_log (lead_id)`
+  await sql`CREATE TABLE IF NOT EXISTS lead_followups (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, note TEXT, follow_up_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ)`
+  await sql`CREATE INDEX IF NOT EXISTS lead_followups_due_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING'`
+  await sql`CREATE TABLE IF NOT EXISTS lead_payments (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, amount NUMERIC(12,2) NOT NULL, paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), method TEXT, note TEXT, recorded_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`
+  await sql`CREATE TABLE IF NOT EXISTS lead_project_stages (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, stage TEXT NOT NULL, note TEXT, stage_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), recorded_by_name TEXT NOT NULL)`
+}
+
 export function getSql() {
   if (sqlClient) return sqlClient
   const databaseUrl = process.env.DATABASE_URL
@@ -52,7 +64,8 @@ export async function ensureLeadTable() {
       feasibility_checked_at TIMESTAMPTZ,
       documents_completed_at TIMESTAMPTZ,
       site_visit_booked_at TIMESTAMPTZ,
-      converted_at TIMESTAMPTZ
+      converted_at TIMESTAMPTZ,
+      source TEXT NOT NULL DEFAULT 'web'
     )
   `
 

@@ -13,16 +13,24 @@ function sign(value: string) {
   return createHmac('sha256', secret()).update(value).digest('base64url')
 }
 
-function encodeIdentity(identity: string) {
-  return Buffer.from(identity, 'utf8').toString('base64url')
+export type AdminIdentity = { email: string; name: string }
+
+function encodeIdentity(identity: AdminIdentity) {
+  return Buffer.from(JSON.stringify(identity), 'utf8').toString('base64url')
 }
 
-function decodeIdentity(encoded: string) {
-  return Buffer.from(encoded, 'base64url').toString('utf8')
+function decodeIdentity(encoded: string): AdminIdentity | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+    if (parsed && typeof parsed.email === 'string' && typeof parsed.name === 'string') return parsed
+    if (typeof parsed === 'string' && parsed) return { email: parsed, name: parsed }
+  } catch {}
+  return null
 }
 
-export function createSession(identity: string) {
-  const encodedIdentity = encodeIdentity(identity)
+export function createSession(identity: AdminIdentity | string) {
+  const normalized = typeof identity === 'string' ? { email: identity, name: identity } : identity
+  const encodedIdentity = encodeIdentity(normalized)
   const payload = `${encodedIdentity}.${Date.now()}`
   return `${payload}.${sign(payload)}`
 }
@@ -43,16 +51,18 @@ export function verifySession(value?: string) {
 
   const expected = sign(`${encodedIdentity}.${timestamp}`)
   try {
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected)) ? identity : false
   } catch {
     return false
   }
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<AdminIdentity> {
   const cookieStore = await cookies()
   const session = cookieStore.get(COOKIE)?.value
-  if (!verifySession(session)) throw new Error('UNAUTHORIZED')
+  const identity = verifySession(session)
+  if (!identity) throw new Error('UNAUTHORIZED')
+  return identity
 }
 
 export const adminCookie = {

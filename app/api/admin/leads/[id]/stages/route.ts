@@ -1,0 +1,6 @@
+import { NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/adminAuth'
+import { ensureAdminTables, getSql } from '@/lib/adminData'
+const STAGES = ['SITE_SURVEY','MATERIAL_ORDERED','INSTALLATION_STARTED','INSTALLATION_COMPLETE','NET_METER_APPLIED','COMMISSIONED']
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) { try { await requireAdmin(); await ensureAdminTables(); const { id } = await params; return NextResponse.json({ stages: await getSql()`SELECT * FROM lead_project_stages WHERE lead_id = ${id} ORDER BY stage_at ASC` }) } catch { return NextResponse.json({ message: 'Unauthorized' }, { status: 401 }) } }
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) { try { const admin = await requireAdmin(); await ensureAdminTables(); const { id } = await params; const body = await request.json(); if (!STAGES.includes(String(body.stage))) return NextResponse.json({ message: 'Invalid stage.' }, { status: 400 }); const rows = await getSql()`INSERT INTO lead_project_stages (lead_id, stage, note, recorded_by_name) VALUES (${id}, ${body.stage}, ${body.note ?? null}, ${admin.name}) RETURNING *`; return NextResponse.json({ stage: (rows as any[])[0] }) } catch { return NextResponse.json({ message: 'Unable to record stage.' }, { status: 400 }) } }
