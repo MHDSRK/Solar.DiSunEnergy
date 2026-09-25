@@ -13,7 +13,7 @@ const stageLabel = (v:string) => String(v||'SITE_SURVEY').replaceAll('_',' ').to
 export default function Admin(){
  const[session,setSession]=useState<any>(null),[password,setPassword]=useState(''),[err,setErr]=useState(''),[notice,setNotice]=useState('')
  const[leads,setLeads]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[followups,setFollowups]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[stages,setStages]=useState<Row[]>([])
- const[tab,setTab]=useState<'SCHEDULE'|'LEADS'|'FOLLOWUPS'>('LEADS'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
+ const[tab,setTab]=useState<'SCHEDULE'|'LEADS'|'FOLLOWUPS'>('SCHEDULE'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
  const[expandedId,setExpandedId]=useState<string|null>(null),[newLeadOpen,setNewLeadOpen]=useState(false),[editLead,setEditLead]=useState<Row|null>(null),[stageLead,setStageLead]=useState<string|null>(null),[customStageOpen,setCustomStageOpen]=useState(false),[customStage,setCustomStage]=useState('')
  const[form,setForm]=useState({name:'',phone:'',district:'',area:'',bill:'',monthly_kwh:'',connection_category:'Domestic',recommended_kw:''})
 
