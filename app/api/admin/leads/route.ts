@@ -25,7 +25,9 @@ export async function POST(request:Request){
   const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json()
   if(!String(body.name??'').trim()||!/^\d{10}$/.test(String(body.phone??''))||!String(body.district??'').trim()||!['Domestic','Commercial'].includes(String(body.connection_category??''))) return NextResponse.json({success:false,message:'Name, valid phone, district and category are required.'},{status:400})
   const leadId=makeLeadId(); const sql=getSql()
-  const vals=fields.map(f=>body[f]??null)
+  const numericFields=['bill','monthly_kwh','recommended_kw','setup_cost','subsidy','financing_amount','customer_contribution']
+  const vals=fields.map(f=>numericFields.includes(f)&&body[f]!==undefined&&body[f]!==null&&String(body[f]).trim()!=='' ? Number(String(body[f]).replace(/,/g,'')) : body[f]??null)
+  if(vals.some((v,i)=>numericFields.includes(fields[i])&&v!==null&&(!Number.isFinite(Number(v))))) return NextResponse.json({success:false,message:'Numeric fields contain an invalid value.'},{status:400})
   await sql.query(`INSERT INTO leads (lead_id,${fields.join(',')},source,lead_status) VALUES ($1,${fields.map((_,i)=>'$'+(i+2)).join(',')},'manual','NEW')`,[leadId,...vals])
   await auditEvent(leadId,'source',`created via manual entry by ${actor.name}`,actor)
   return NextResponse.json({success:true,leadId})
