@@ -19,8 +19,10 @@ export function getAdminAccounts(): AdminAccount[] {
     passwordHash: hash,
   }]
 }
-export async function authenticateAdmin(email: string, password: string): Promise<AdminAccount | null> {
-  const account = getAdminAccounts().find(x => x.email.toLowerCase() === email.trim().toLowerCase())
-  if (!account) return null
-  return await verifyAdminPassword(password, account.passwordHash) ? account : null
+export async function authenticateAdmin(password: string): Promise<AdminAccount | null> {
+  const accounts = getAdminAccounts()
+  for (const account of accounts) {
+    if (await verifyAdminPassword(password, account.passwordHash)) return account
+  }
+  return null
 }
