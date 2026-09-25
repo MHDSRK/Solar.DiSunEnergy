@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       const sent = await sendWhatsAppFollowupReminder(row)
       results.push({ id: row.id, sent: sent.sent, configured: sent.configured })
       if (sent.sent) {
-        await getSql()\`UPDATE lead_followups SET status='REMINDER_SENT' WHERE id=\${Number(row.id)} AND status='PENDING'\`
+        await getSql().query("UPDATE lead_followups SET status='REMINDER_SENT' WHERE id=$1 AND status='PENDING'", [Number(row.id)])
       }
     } catch (error) {
       results.push({ id: row.id, sent: false, error: error instanceof Error ? error.message : String(error) })
