@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Clock3, History, Plus, Trash2, X, Check, ChevronDown, UserPlus, CalendarDays } from 'lucide-react'
+import { Clock3, History, Plus, Trash2, X, Check, ChevronDown, CalendarDays } from 'lucide-react'
 
 type Row = Record<string, any>
 
