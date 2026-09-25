@@ -8,13 +8,12 @@ export async function POST(request: Request) {
     const rate = await checkRateLimit(request, 'admin-login', 5, 900)
     if (rate.limited) return rateLimitResponse(rate.retryAfter)
     const body = await request.json()
-    const email = String(body.email ?? '').trim()
     const password = String(body.password ?? '')
     if (!process.env.ADMIN_SESSION_SECRET || !getAdminAccounts().length) {
       return NextResponse.json({ success: false, message: 'Admin authentication is not configured.' }, { status: 500 })
     }
-    const account = await authenticateAdmin(email, password)
-    if (!account) return NextResponse.json({ success: false, message: 'Invalid email or password.' }, { status: 401 })
+    const account = await authenticateAdmin(password)
+    if (!account) return NextResponse.json({ success: false, message: 'Invalid password.' }, { status: 401 })
     const response = NextResponse.json({ success: true, name: account.name, email: account.email })
     response.cookies.set(adminCookie.name, createSession({ name: account.name, email: account.email }), adminCookie)
     return response
