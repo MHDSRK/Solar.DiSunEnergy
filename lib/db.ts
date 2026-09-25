@@ -45,6 +45,7 @@ export async function ensureLeadTable() {
       kseb_grid_connected_kw NUMERIC,
       kseb_checked_at TIMESTAMPTZ,
       lead_status TEXT NOT NULL DEFAULT 'NEW',
+      source TEXT NOT NULL DEFAULT 'web',
       privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
       privacy_consent_at TIMESTAMPTZ,
       terms_version TEXT,
@@ -63,6 +64,7 @@ export async function ensureLeadTable() {
       ADD COLUMN IF NOT EXISTS kseb_grid_connected_kw NUMERIC,
       ADD COLUMN IF NOT EXISTS kseb_checked_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS lead_status TEXT NOT NULL DEFAULT 'NEW',
+      ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'web',
       ADD COLUMN IF NOT EXISTS privacy_consent BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS privacy_consent_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS terms_version TEXT,
@@ -156,6 +158,41 @@ export async function ensureLeadTable() {
       lead_id TEXT,
       details JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_audit_log (
+      id SERIAL PRIMARY KEY,
+      lead_id TEXT NOT NULL,
+      field TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      changed_by_name TEXT NOT NULL,
+      changed_by_email TEXT NOT NULL,
+      changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+  await sql`CREATE INDEX IF NOT EXISTS lead_audit_log_lead_id_idx ON lead_audit_log (lead_id)`
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_followups (
+      id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, note TEXT,
+      follow_up_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING',
+      created_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ
+    )
+  `
+  await sql`CREATE INDEX IF NOT EXISTS lead_followups_due_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING'`
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_payments (
+      id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, amount NUMERIC(12,2) NOT NULL,
+      paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), method TEXT, note TEXT,
+      recorded_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_project_stages (
+      id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, stage TEXT NOT NULL, note TEXT,
+      stage_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), recorded_by_name TEXT NOT NULL
     )
   `
 
