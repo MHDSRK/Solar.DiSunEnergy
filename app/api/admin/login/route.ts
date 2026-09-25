@@ -1,28 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createSession, adminCookie } from '@/lib/adminAuth'
-import { verifyAdminPassword } from '@/lib/adminPassword'
+import { authenticateAdmin, getAdminAccounts } from '@/lib/adminAccounts'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
 
 export async function POST(request: Request) {
   try {
     const rate = await checkRateLimit(request, 'admin-login', 5, 900)
     if (rate.limited) return rateLimitResponse(rate.retryAfter)
-
     const body = await request.json()
+    const email = String(body.email ?? '').trim()
     const password = String(body.password ?? '')
-    const loginIdentity = 'admin'
-    const passwordHash = String(process.env.ADMIN_PASSWORD_HASH ?? '')
-    if (!passwordHash || !process.env.ADMIN_SESSION_SECRET) {
+    if (!process.env.ADMIN_SESSION_SECRET || !getAdminAccounts().length) {
       return NextResponse.json({ success: false, message: 'Admin authentication is not configured.' }, { status: 500 })
     }
-
-    const validPassword = await verifyAdminPassword(password, passwordHash)
-    if (!validPassword) {
-      return NextResponse.json({ success: false, message: 'Invalid password.' }, { status: 401 })
-    }
-
-    const response = NextResponse.json({ success: true })
-    response.cookies.set(adminCookie.name, createSession(loginIdentity), adminCookie)
+    const account = await authenticateAdmin(email, password)
+    if (!account) return NextResponse.json({ success: false, message: 'Invalid email or password.' }, { status: 401 })
+    const response = NextResponse.json({ success: true, name: account.name, email: account.email })
+    response.cookies.set(adminCookie.name, createSession({ name: account.name, email: account.email }), adminCookie)
     return response
   } catch (error) {
     console.error('Admin login failed', error)
