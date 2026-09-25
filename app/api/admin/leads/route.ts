@@ -1,120 +1,43 @@
 import { NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
+import { auditEvent } from '@/lib/adminAudit'
 
-export async function GET() {
-  try {
-    await requireAdmin()
-    await ensureLeadTable()
-    const sql = getSql()
+function makeLeadId(){const d=new Date().toISOString().slice(0,10).replace(/-/g,'');return `DSN-${d}-${crypto.randomUUID().slice(0,8).toUpperCase()}`}
+const fields=['name','phone','district','area','bill','monthly_kwh','connection_category','recommended_kw','setup_cost','subsidy','financing_amount','customer_contribution','kseb_consumer_number','kseb_district','kseb_section','transformer']
+function unauthorized(e:unknown){return e instanceof Error&&e.message==='UNAUTHORIZED'}
 
-    const leadRows = (await sql`
-      SELECT * FROM leads ORDER BY created_at DESC
-    `) as unknown as Record<string, any>[]
-
-    const documentRows = (await sql`
-      SELECT lead_id, document_type, file_name, mime_type, size_bytes, uploaded_at
-      FROM lead_documents ORDER BY uploaded_at DESC
-    `) as unknown as Record<string, any>[]
-
-    const siteVisitRows = (await sql`
-      SELECT lead_id, name, phone, preferred_date, preferred_time, location, district, locality, area, latitude, longitude, status, created_at, updated_at
-      FROM site_visits ORDER BY created_at DESC
-    `) as unknown as Record<string, any>[]
-
-    let notificationRows: Record<string, any>[] = []
-    let notificationQueryError = ''
-    try {
-      notificationRows = (await sql`
-        SELECT event_key, channel, status, attempts, last_error, updated_at
-        FROM notification_events ORDER BY updated_at DESC
-      `) as unknown as Record<string, any>[]
-    } catch (error) {
-      notificationQueryError = error instanceof Error ? error.message : String(error)
-      console.error('Admin notification log load failed', error)
-    }
-
-    const documentsByLead = new Map<string, any[]>()
-    for (const document of documentRows) {
-      const list = documentsByLead.get(String(document.lead_id)) ?? []
-      list.push(document)
-      documentsByLead.set(String(document.lead_id), list)
-    }
-
-    const siteVisitsByLead = new Map<string, any>()
-    for (const visit of siteVisitRows) siteVisitsByLead.set(String(visit.lead_id), visit)
-
-    const notificationsByLead = new Map<string, any[]>()
-    for (const notification of notificationRows) {
-      const leadId = String(notification.event_key).split(':')[0]
-      const list = notificationsByLead.get(leadId) ?? []
-      list.push(notification)
-      notificationsByLead.set(leadId, list)
-    }
-
-    const leads = leadRows.map((lead: any) => ({
-      ...lead,
-      documents: documentsByLead.get(String(lead.lead_id)) ?? [],
-      site_visit: siteVisitsByLead.get(String(lead.lead_id)) ?? null,
-      notifications: notificationsByLead.get(String(lead.lead_id)) ?? [],
-    }))
-
-    const stats = {
-      total: leads.length,
-      contact: leads.filter((x: any) => x.name || x.phone).length,
-      calculated: leads.filter((x: any) => x.recommended_kw !== null).length,
-      feasibility: leads.filter((x: any) => x.feasibility_status !== null).length,
-    }
-
-    return NextResponse.json({
-      success: true,
-      leads,
-      stats,
-      diagnostics: {
-        database: 'ok',
-        leadsCount: leads.length,
-        notificationLog: notificationQueryError ? 'error' : 'ok',
-        notificationQueryError: notificationQueryError || null,
-      },
-    })
-  } catch (error) {
-    const unauthorized = error instanceof Error && error.message === 'UNAUTHORIZED'
-    if (!unauthorized) console.error('Admin leads load failed', error)
-    return NextResponse.json({
-      success: false,
-      message: unauthorized ? 'Unauthorized' : error instanceof Error ? error.message : 'Unable to load leads.',
-    }, { status: unauthorized ? 401 : 500 })
-  }
+export async function GET(){
+ try{
+  await requireAdmin(); await ensureLeadTable(); const sql=getSql()
+  const leads=await sql`SELECT * FROM leads ORDER BY created_at DESC`
+  const audit=await sql`SELECT * FROM lead_audit_log ORDER BY changed_at DESC`
+  const followups=await sql`SELECT * FROM lead_followups ORDER BY follow_up_at ASC`
+  const payments=await sql`SELECT * FROM lead_payments ORDER BY paid_at DESC`
+  const stages=await sql`SELECT * FROM lead_project_stages ORDER BY stage_at ASC`
+  const docs=await sql`SELECT lead_id,document_type,file_name,mime_type,size_bytes,uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`
+  const visits=await sql`SELECT * FROM site_visits ORDER BY created_at DESC`
+  return NextResponse.json({success:true,leads,audit,followups,payments,stages,documents:docs,siteVisits:visits,stats:{total:leads.length,contact:leads.filter((x:any)=>x.name||x.phone).length,calculated:leads.filter((x:any)=>x.recommended_kw!=null).length,feasibility:leads.filter((x:any)=>x.feasibility_status!=null).length}})
+ }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to load leads.'},{status:unauthorized(e)?401:500})}
 }
-
-export async function DELETE(request: Request) {
-  try {
-    await requireAdmin()
-    await ensureLeadTable()
-    const body = await request.json().catch(() => ({}))
-    const sql = getSql()
-
-    if (body.all === true) {
-      if (body.confirmation !== 'DELETE ALL') return NextResponse.json({ success: false, message: 'Type DELETE ALL to confirm.' }, { status: 400 })
-      await sql.transaction([
-        sql`DELETE FROM leads`,
-        sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ all: true })}::jsonb)`,
-      ])
-      return NextResponse.json({ success: true })
-    }
-
-    const ids = Array.isArray(body.leadIds) ? body.leadIds.map(String).filter(Boolean) : []
-    if (!ids.length) return NextResponse.json({ success: false, message: 'No leads selected.' }, { status: 400 })
-
-    const idArray = ids
-    await sql.transaction([
-      sql`DELETE FROM leads WHERE lead_id = ANY(${idArray}::text[])`,
-      sql`INSERT INTO admin_audit_logs (action, details) VALUES ('LEADS_BULK_DELETE', ${JSON.stringify({ leadIds: ids })}::jsonb)`,
-    ])
-    return NextResponse.json({ success: true, deleted: ids.length })
-  } catch (error) {
-    const unauthorized = error instanceof Error && error.message === 'UNAUTHORIZED'
-    if (!unauthorized) console.error('Admin leads delete failed', error)
-    return NextResponse.json({ success: false, message: unauthorized ? 'Unauthorized' : 'Unable to delete leads.' }, { status: unauthorized ? 401 : 500 })
-  }
+export async function POST(request:Request){
+ try{
+  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json()
+  if(!String(body.name??'').trim()||!/^\d{10}$/.test(String(body.phone??''))||!String(body.district??'').trim()||!['Domestic','Commercial'].includes(String(body.connection_category??''))) return NextResponse.json({success:false,message:'Name, valid phone, district and category are required.'},{status:400})
+  const leadId=makeLeadId(); const sql=getSql()
+  const vals=fields.map(f=>body[f]??null)
+  await sql.query(`INSERT INTO leads (lead_id,${fields.join(',')},source,lead_status) VALUES ($1,${fields.map((_,i)=>'$'+(i+2)).join(',')},'manual','NEW')`,[leadId,...vals])
+  await auditEvent(leadId,'source',`created via manual entry by ${actor.name}`,actor)
+  return NextResponse.json({success:true,leadId})
+ }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to create lead.'},{status:unauthorized(e)?401:500})}
+}
+export async function DELETE(request:Request){
+ try{
+  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json(); const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
+  if(!ids.length) return NextResponse.json({success:false,message:'No leads selected.'},{status:400})
+  const rows=await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`
+  for(const row of rows as any[]) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
+  await getSql()`DELETE FROM leads WHERE lead_id = ANY(${ids}::text[])`
+  return NextResponse.json({success:true,deleted:ids.length})
+ }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to delete leads.'},{status:unauthorized(e)?401:500})}
 }
