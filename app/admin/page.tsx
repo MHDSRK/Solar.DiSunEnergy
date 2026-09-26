@@ -19,7 +19,7 @@ export default function Admin(){
 
  const load=async()=>{const r=await fetch('/api/admin/leads',{cache:'no-store'});const d=await r.json();if(r.ok){setLeads(d.leads||[]);setAudit(d.audit||[]);setFollowups(d.followups||[]);setPayments(d.payments||[]);setStages(d.stages||[])}}
  useEffect(()=>{fetch('/api/admin/session').then(async r=>{const d=await r.json();setSession(d);if(d.authenticated)load()})},[])
- const login=async(e:any)=>{e.preventDefault();setErr('');const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})});const d=await r.json();if(!r.ok){setErr(d.message||'Login failed');return}setSession(d);setPassword('');load()}
+ const login=async(e:any)=>{e.preventDefault();setErr('');try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})});const d=await r.json().catch(()=>({}));if(!r.ok){setErr(d.message||'Login failed');return}setSession({authenticated:true,name:d.name,email:d.email});setPassword('');await load()}catch{setErr('Unable to connect to the server. Please try again.')}}
  const stageNames=useMemo(()=>[...new Set([...STAGES,...stages.map(x=>String(x.stage||'')).filter(Boolean)])],[stages])
  const currentStage=(id:string)=>stages.filter(x=>x.lead_id===id).sort((a,b)=>new Date(a.stage_at).getTime()-new Date(b.stage_at).getTime()).at(-1)?.stage||'SITE_SURVEY'
  const paid=(id:string)=>payments.filter(p=>p.lead_id===id).reduce((n,p)=>n+Number(p.amount||0),0)
