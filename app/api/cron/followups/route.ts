@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const rows = await getSql().query(
     `SELECT f.id,f.lead_id,f.note,f.follow_up_at,l.name,l.phone
      FROM lead_followups f JOIN leads l ON l.lead_id=f.lead_id
-     WHERE f.status='PENDING' AND f.follow_up_at <= NOW()
+     WHERE f.status='PENDING' AND f.reminder_sent_at IS NULL AND f.follow_up_at <= NOW()
      ORDER BY f.follow_up_at ASC LIMIT 100`,
   ) as unknown as Record<string, any>[]
   const results = []
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       const sent = await sendWhatsAppFollowupReminder(row)
       results.push({ id: row.id, sent: sent.sent, configured: sent.configured })
       if (sent.sent) {
-        await getSql().query("UPDATE lead_followups SET status='REMINDER_SENT' WHERE id=$1 AND status='PENDING'", [Number(row.id)])
+        await getSql().query("UPDATE lead_followups SET reminder_sent_at=NOW() WHERE id=$1 AND status='PENDING' AND reminder_sent_at IS NULL", [Number(row.id)])
       }
     } catch (error) {
       results.push({ id: row.id, sent: false, error: error instanceof Error ? error.message : String(error) })
