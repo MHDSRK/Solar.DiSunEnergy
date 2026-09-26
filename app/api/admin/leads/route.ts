@@ -40,6 +40,6 @@ export async function DELETE(request:Request){
   const rows=(await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`) as Record<string,any>[]
   for(const row of rows) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
   await getSql()`DELETE FROM leads WHERE lead_id = ANY(${ids}::text[])`
-  return NextResponse.json({success:true,deleted:ids.length})
+  return NextResponse.json({success:true,deleted:rows.length})
  }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to delete leads.'},{status:unauthorized(e)?401:500})}
 }
