@@ -183,7 +183,7 @@ export async function ensureLeadTable() {
   `
   await sql`ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ`
   await sql`UPDATE lead_followups SET status = 'PENDING', reminder_sent_at = COALESCE(reminder_sent_at, NOW()) WHERE status = 'REMINDER_SENT'`
-  await sql`CREATE INDEX IF NOT EXISTS lead_followups_due_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING' AND reminder_sent_at IS NULL`
+  await sql`CREATE INDEX IF NOT EXISTS lead_followups_due_reminder_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING' AND reminder_sent_at IS NULL`
   await sql`
     CREATE TABLE IF NOT EXISTS lead_payments (
       id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, amount NUMERIC(12,2) NOT NULL,
