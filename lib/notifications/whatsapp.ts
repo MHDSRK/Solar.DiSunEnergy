@@ -19,6 +19,14 @@ function format(value: unknown) {
   return value === null || value === undefined || value === '' ? '-' : String(value)
 }
 
+function formatFollowupDateTime(value: unknown) {
+  if (value === null || value === undefined || value === '') return '-'
+  const date = new Date(String(value))
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' +
+    date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+}
+
 function templateParameters(lead: Record<string, unknown>) {
   return [
     format(lead.lead_id),
@@ -79,7 +87,7 @@ export async function sendWhatsAppFollowupReminder(followup: Record<string, unkn
     method: 'POST', headers: { Authorization: `Bearer ${current.accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product:'whatsapp', recipient_type:'individual', to:recipient(), type:'template', template:{name:templateName,language:{code:templateLanguage},components:[{type:'body',parameters:[
       {type:'text',text:format(followup.name)},
-      {type:'text',text:format(followup.follow_up_at)},
+      {type:'text',text:formatFollowupDateTime(followup.follow_up_at)},
       {type:'text',text:format(followup.note)},
     ]}]}}), cache:'no-store'
   })
