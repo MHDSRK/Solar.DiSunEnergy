@@ -1,0 +1,20 @@
+name: Follow-up Reminder Cron
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  followups:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger follow-up reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X GET \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://solardisunenergy.vercel.app/api/cron/followups"
