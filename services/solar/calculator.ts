@@ -44,6 +44,14 @@ export function calculateSolarResult(input: number, category: string, mode: Calc
   const cost = calculateSetupCost(kw)
   const subsidy = calculateSubsidy(kw, category)
   const loan = 200000
+  const annualGenerationKwh = Number((kw * 120 * 12).toFixed(0))
+  const effectiveMonthlyBill = Math.max(0, input)
+  const estimatedAnnualSavings = Number((Math.min(effectiveMonthlyBill, calculateBillFromUnits(Math.max(0, units), category)) * 12).toFixed(0))
+  const netSystemCost = Math.max(0, cost - subsidy)
+  const paybackYears = estimatedAnnualSavings > 0 ? Number((netSystemCost / estimatedAnnualSavings).toFixed(2)) : null
+  const monthlyRate = 0.01
+  const tenureMonths = 60
+  const emi = loan > 0 ? Number(((loan * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) / (Math.pow(1 + monthlyRate, tenureMonths) - 1)).toFixed(0)) : 0
   return {
     kw,
     roofMin: kw * 80,
@@ -52,6 +60,12 @@ export function calculateSolarResult(input: number, category: string, mode: Calc
     subsidy,
     loan,
     netCost: Math.max(0, cost - subsidy - loan),
+    netSystemCost,
     monthlyKwh: Number(units.toFixed(2)),
+    annualGenerationKwh,
+    estimatedAnnualSavings,
+    estimatedMonthlySavings: Number((estimatedAnnualSavings / 12).toFixed(0)),
+    paybackYears,
+    loanAssumption: { principal: loan, annualInterestRate: 12, tenureMonths, estimatedEmi: emi },
   }
 }
