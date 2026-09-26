@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Check, ChevronDown, Clock3, History, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 type Row = Record<string, any>
@@ -11,15 +11,15 @@ const timeOnly = (v:any) => v ? new Date(v).toLocaleTimeString('en-IN',{hour:'2-
 const stageLabel = (v:string) => String(v||'SITE_SURVEY').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,x=>x.toUpperCase())
 
 export default function Admin(){
- const[session,setSession]=useState<any>(null),[password,setPassword]=useState(''),[err,setErr]=useState(''),[notice,setNotice]=useState('')
+ const[session,setSession]=useState<any>(null),[password,setPassword]=useState(''),[err,setErr]=useState(''),[notice,setNotice]=useState(''); const loginInFlight=useRef(false)
  const[leads,setLeads]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[followups,setFollowups]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[stages,setStages]=useState<Row[]>([])
  const[tab,setTab]=useState<'SCHEDULE'|'LEADS'|'FOLLOWUPS'>('SCHEDULE'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
  const[expandedId,setExpandedId]=useState<string|null>(null),[newLeadOpen,setNewLeadOpen]=useState(false),[editLead,setEditLead]=useState<Row|null>(null),[paymentLead,setPaymentLead]=useState<string|null>(null),[paymentAmount,setPaymentAmount]=useState(""),[paymentMethod,setPaymentMethod]=useState(""),[paymentNote,setPaymentNote]=useState(""),[stageLead,setStageLead]=useState<string|null>(null),[customStageOpen,setCustomStageOpen]=useState(false),[customStage,setCustomStage]=useState('')
  const[form,setForm]=useState({name:'',phone:'',district:'',area:'',bill:'',monthly_kwh:'',connection_category:'Domestic',recommended_kw:''})
 
  const load=async()=>{const r=await fetch('/api/admin/leads',{cache:'no-store'});const d=await r.json();if(r.ok){setLeads(d.leads||[]);setAudit(d.audit||[]);setFollowups(d.followups||[]);setPayments(d.payments||[]);setStages(d.stages||[])}}
- useEffect(()=>{fetch('/api/admin/session').then(async r=>{const d=await r.json();setSession(d);if(d.authenticated)load()})},[])
- const login=async(e:any)=>{e.preventDefault();setErr('');try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})});const d=await r.json().catch(()=>({}));if(!r.ok){setErr(d.message||'Login failed');return}setSession({authenticated:true,name:d.name,email:d.email});setPassword('');await load()}catch{setErr('Unable to connect to the server. Please try again.')}}
+ useEffect(()=>{let active=true;fetch('/api/admin/session',{cache:'no-store'}).then(async r=>{const d=await r.json();if(!active||loginInFlight.current)return;setSession(d);if(d.authenticated)await load()}).catch(()=>{if(active&&!loginInFlight.current)setSession({authenticated:false})});return()=>{active=false}},[])
+ const login=async(e:any)=>{e.preventDefault();if(loginInFlight.current)return;setErr('');loginInFlight.current=true;try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',body:JSON.stringify({password})});const d=await r.json().catch(()=>({}));if(!r.ok){setErr(d.message||'Login failed');return}setPassword('');setSession({authenticated:true,name:d.name,email:d.email});await load()}catch{setErr('Unable to connect to the server. Please try again.')}finally{loginInFlight.current=false}}
  const stageNames=useMemo(()=>[...new Set([...STAGES,...stages.map(x=>String(x.stage||'')).filter(Boolean)])],[stages])
  const currentStage=(id:string)=>stages.filter(x=>x.lead_id===id).sort((a,b)=>new Date(a.stage_at).getTime()-new Date(b.stage_at).getTime()).at(-1)?.stage||'SITE_SURVEY'
  const paid=(id:string)=>payments.filter(p=>p.lead_id===id).reduce((n,p)=>n+Number(p.amount||0),0)
