@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 
-## Passed in code review
+## Verified security controls
 
 - Admin APIs require the HMAC session through `requireAdmin()`.
 - Admin sessions contain partner identity and use HMAC SHA-256 with constant-time signature comparison.
@@ -13,8 +13,12 @@ Date: 2026-09-26
 - Follow-up cron requires `CRON_SECRET`.
 - Destructive lead deletion requires an authenticated admin action and explicit UI confirmation.
 - Proposal and Forms Filling pages are server-gated with `requireAdmin()`.
-- Production response headers now include HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, COOP, and X-Permitted-Cross-Domain-Policies.
+- Production response headers are configured in the single active `next.config.ts`: HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, COOP, and X-Permitted-Cross-Domain-Policies. This must be verified against the Vercel build/runtime after deployment.
 - PDF processing is client-side; uploaded customer PDFs are not sent to the PDF library CDN.
+
+## PDF tooling / CSP note
+
+- Proposal Maker and Forms Filling lazy-load pdf-lib from `cdn.jsdelivr.net`. There is currently no Content-Security-Policy header. If CSP is introduced later, `script-src` must explicitly allow `https://cdn.jsdelivr.net` or the PDF tools will stop loading the library.
 
 ## Residual operational gates
 
