@@ -20,14 +20,47 @@ export async function getKsebSections(districtId: string) {
   return Object.entries(sections).map(([name, id]) => ({ id: String(id), name }))
 }
 
+type KsebSection = { sectionId: string; name: string; districtId: string; districtName: string }
+
+const SECTION_CACHE_TTL_MS = 5 * 60 * 1000
+const SECTION_FETCH_CONCURRENCY = 4
+let sectionCache: { expiresAt: number; sections: KsebSection[] } | null = null
+let sectionFetch: Promise<KsebSection[]> | null = null
+
 async function getSections() {
-  const districts = await post('getDistricts')
-  const output: Array<{ sectionId: string; name: string; districtId: string; districtName: string }> = []
-  for (const [districtName, districtId] of Object.entries(districts)) {
-    const sections = await post('getinputSection', { distictid: String(districtId) })
-    for (const [name, sectionId] of Object.entries(sections)) output.push({ sectionId: String(sectionId), name, districtId: String(districtId), districtName })
+  if (sectionCache && sectionCache.expiresAt > Date.now()) return sectionCache.sections
+  if (sectionFetch) return sectionFetch
+
+  sectionFetch = (async () => {
+    const districts = await post('getDistricts')
+    const entries = Object.entries(districts)
+    const output: KsebSection[] = []
+    let nextIndex = 0
+
+    async function fetchNextDistrict() {
+      while (nextIndex < entries.length) {
+        const currentIndex = nextIndex++
+        const [districtName, districtId] = entries[currentIndex]
+        const sections = await post('getinputSection', { distictid: String(districtId) })
+        for (const [name, sectionId] of Object.entries(sections)) {
+          output.push({ sectionId: String(sectionId), name, districtId: String(districtId), districtName })
+        }
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(SECTION_FETCH_CONCURRENCY, entries.length) }, () => fetchNextDistrict()),
+    )
+
+    sectionCache = { expiresAt: Date.now() + SECTION_CACHE_TTL_MS, sections: output }
+    return output
+  })()
+
+  try {
+    return await sectionFetch
+  } finally {
+    sectionFetch = null
   }
-  return output
 }
 
 export async function resolveKsebSection(input: { sectionId?: string; sectionOffice?: string; district?: string }) {
