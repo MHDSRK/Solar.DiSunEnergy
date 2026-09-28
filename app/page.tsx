@@ -544,7 +544,7 @@ export default function Page() {
                   <div className="grid grid-cols-3 gap-2 border-t border-slate-200 pt-2 text-[11px]">
                     <p><strong>Section Office</strong><br />{String((feasibilityResult.section as { name?: string })?.name ?? '')}</p>
                     <p><strong>Transformer</strong><br />{String((feasibilityResult.transformer as { transformerName?: string })?.transformerName ?? '')}</p>
-                    <p><strong>90% DTR Capacity</strong><br /><strong>{String((feasibilityResult.transformer as { allowedCapacityKw?: number })?.allowedCapacityKw)} kW</strong></p>
+                    <p className="whitespace-nowrap"><strong>DTR Capacity</strong><br /><strong>{String((feasibilityResult.transformer as { allowedCapacityKw?: number })?.allowedCapacityKw)} kW</strong></p>
                   </div>
 
                   <div className="border-t border-slate-200 pt-2 text-center">
