@@ -92,6 +92,8 @@ export default function Admin(){
  </>} {taskModal&&addTaskMode===null&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>setTaskModal(null)} save={saveTask}/>}  {addTaskMode==='CHOOSER'&&<AddTaskChooser close={()=>setAddTaskMode(null)} chooseNew={()=>{setTaskModal({name:'',place:'',number:'',plant:'',stage:'',payment:'',source:'Manual',note:'',task_date:new Date().toISOString().slice(0,10)});setAddTaskMode('NEW')}} chooseExisting={()=>setAddTaskMode('EXISTING')}/>} {addTaskMode==='NEW'&&taskModal&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>{setTaskModal(null);setAddTaskMode(null)}} save={saveNewTask} fixedSource/>} {addTaskMode==='EXISTING'&&<ExistingTaskModal leads={leads} tasks={tasks} close={()=>setAddTaskMode(null)} openTask={(task)=>{setTaskModal(task);setAddTaskMode('NEW')}}/>} {newLeadOpen&&<NewLeadModal form={form} setForm={setForm} close={()=>setNewLeadOpen(false)} create={create}/>}
  {editLead&&<EditLeadModal lead={editLead} setLead={setEditLead} close={()=>setEditLead(null)} save={saveEdit}/>}
  {historyOpen&&<HistoryModal rows={audit} close={()=>setHistoryOpen(false)}/>}
+ </section>
+ </div>
  </main>
 }
 
