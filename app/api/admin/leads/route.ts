@@ -28,7 +28,7 @@ export async function POST(request:Request){
   if(phone&&!/^\d{10}$/.test(phone)) return NextResponse.json({success:false,message:'Phone number must contain 10 digits.'},{status:400})
   const leadId=makeLeadId(); const sql=getSql()
   const numericFields=['recommended_kw','remaining_transformer_capacity']
-  const vals=fields.map(f=>numericFields.includes(f)&&body[f]!==undefined&&body[f]!==null&&String(body[f]).trim()!==''?Number(String(body[f]).replace(/,/g,'')):f==='phone'?(phone||null):(body[f]??null))
+  const vals=fields.map(f=>{ const raw=body[f]; const text=String(raw??'').trim(); if(numericFields.includes(f)) return text===''?null:Number(text.replace(/,/g,'')); if(f==='phone') return phone||null; return text===''?null:raw })
   if(vals.some((v,i)=>numericFields.includes(fields[i])&&v!==null&&!Number.isFinite(Number(v)))) return NextResponse.json({success:false,message:'Numeric fields contain an invalid value.'},{status:400})
   const placeholders=fields.map((_,i)=>'$'+(i+2)).join(',')
   await sql.query(`INSERT INTO leads (lead_id,${fields.join(',')},source,lead_status) VALUES ($1,${placeholders},'manual','NEW')`,[leadId,...vals])
