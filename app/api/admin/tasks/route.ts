@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { ensureLeadTable, getSql } from '@/lib/db'
+import { ensureAdminTasksTable, ensureLeadTable, getSql } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
 
 const unauthorized=(e:unknown)=>e instanceof Error&&e.message==='UNAUTHORIZED'
 
 export async function GET(){
  try{
-  await requireAdmin(); await ensureLeadTable()
+  await requireAdmin(); await ensureLeadTable(); await ensureAdminTasksTable()
   const tasks=(await getSql()`SELECT * FROM admin_tasks ORDER BY task_date ASC, created_at ASC`) as Record<string,any>[]
   return NextResponse.json({success:true,tasks})
  }catch(e){
