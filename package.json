@@ -9,7 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "hash:admin-password": "node scripts/hash-admin-password.mjs"
+    "hash:admin-password": "node scripts/hash-admin-password.mjs",
+    "db:migrate": "node scripts/migrate-db.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
