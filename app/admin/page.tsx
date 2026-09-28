@@ -13,7 +13,7 @@ const stageLabel = (v:string) => String(v||'SITE_SURVEY').replaceAll('_',' ').to
 export default function Admin(){
  const[session,setSession]=useState<any>(null),[password,setPassword]=useState(''),[err,setErr]=useState(''),[notice,setNotice]=useState(''); const loginInFlight=useRef(false)
  const[leads,setLeads]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[stages,setStages]=useState<Row[]>([]),[tasks,setTasks]=useState<Row[]>([])
- const[tab,setTab]=useState<'TASKS'|'LEADS'>('TASKS'),[leadSection,setLeadSection]=useState<'SELECTED'|'ALL'>('ALL'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
+ const[tab,setTab]=useState<'TASKS'|'LEADS'>('TASKS'),[leadSection,setLeadSection]=useState<'SELECTED'|'ALL'>('SELECTED'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
  const[expandedId,setExpandedId]=useState<string|null>(null),[newLeadOpen,setNewLeadOpen]=useState(false),[editLead,setEditLead]=useState<Row|null>(null),[paymentLead,setPaymentLead]=useState<string|null>(null),[paymentAmount,setPaymentAmount]=useState(""),[paymentMethod,setPaymentMethod]=useState(""),[paymentNote,setPaymentNote]=useState(""),[stageLead,setStageLead]=useState<string|null>(null),[customStageOpen,setCustomStageOpen]=useState(false),[customStage,setCustomStage]=useState('')
  const[form,setForm]=useState({name:'',phone:'',district:'',area:'',bill:'',monthly_kwh:'',connection_category:'Domestic',recommended_kw:''})
  const[taskModal,setTaskModal]=useState<Row|null>(null),[addTaskMode,setAddTaskMode]=useState<'CHOOSER'|'NEW'|'EXISTING'|null>(null)
@@ -51,41 +51,29 @@ export default function Admin(){
  {tab==='LEADS'&&<><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2">{deleteMode&&<button title="Select all" onClick={toggleAll} className="grid size-9 place-items-center rounded-xl border bg-white">{allSelected?<Check size={17}/>:<span className="text-sm">□</span>}</button>}<div><h2 className="text-lg font-black">All Leads</h2><p className="text-xs text-slate-500">{leads.length} total leads</p></div></div><button onClick={()=>setNewLeadOpen(true)} title="Add new lead" className="grid size-11 place-items-center rounded-full bg-sky-600 text-white shadow-lg shadow-sky-200"><Plus size={23}/></button></div>
  {deleteMode&&selectedIds.length>0&&<div className="sticky top-[126px] z-20 mb-3 flex items-center justify-between rounded-2xl bg-red-600 px-4 py-3 text-white shadow-lg"><span className="text-sm font-bold">{selectedIds.length} selected</span><button onClick={deleteSelected} className="rounded-full bg-white px-4 py-2 text-xs font-black text-red-600">DELETE</button></div>}
  <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1"><button onClick={()=>setLeadSection('SELECTED')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='SELECTED'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>Selected</button><button onClick={()=>setLeadSection('ALL')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='ALL'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All</button></div>
- <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="grid grid-cols-[1fr_1fr_auto] border-b bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:px-4"><div className="flex items-center gap-2">{deleteMode&&<span className="w-8"/>}Name</div><div>Stage</div><div className="w-24 text-right">Payment</div></div>
- {((leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads)).length===0&&<div className="p-8 text-center text-sm text-slate-400">{leadSection==='SELECTED'?'No selected leads.':'No leads yet.'}</div>}
-  {(leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads).map(l=>{const id=String(l.lead_id),expanded=expandedId===id,stage=currentStage(id);return (
+ <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+ {((leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads)).length===0&&<div className="p-8 text-center text-xs text-slate-400">{leadSection==='SELECTED'?'No selected leads.':'No leads yet.'}</div>}
+ {(leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads).map(l=>{const id=String(l.lead_id),expanded=expandedId===id;return (
    <div key={id} className="border-b last:border-0">
-    <div className="grid min-h-16 grid-cols-[1fr_1fr_auto] items-center gap-2 px-3 py-2 sm:px-4">
-     <div className="flex min-w-0 items-center gap-2">
-      <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-8 shrink-0 place-items-center rounded-lg hover:bg-amber-50"><span className={`text-xl leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
-      {deleteMode&&<input type="checkbox" checked={selectedIds.includes(id)} onChange={()=>toggleSelect(id)} className="size-4 shrink-0 accent-red-600"/>}
-      <button onClick={()=>setExpandedId(expanded?null:id)} className="min-w-0 text-left"><span className="block truncate text-sm font-bold">{l.name||'Unnamed lead'}</span><span className="block truncate text-[10px] text-slate-400">{id}</span></button>
+    <div className="grid min-h-14 grid-cols-[1fr_auto_auto] items-center gap-1 px-3 py-1.5 sm:grid-cols-[1fr_auto_auto] sm:px-4">
+     <div className="flex min-w-0 items-center gap-1.5">
+      <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-7 shrink-0 place-items-center rounded-lg hover:bg-amber-50"><span className={`text-base leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
+      <button onClick={()=>setExpandedId(expanded?null:id)} className="min-w-0 text-left"><span className="block truncate text-xs font-semibold text-slate-700">{l.name||'Unnamed lead'}</span><span className="block truncate text-[9px] text-slate-400">{l.phone||'—'}</span></button>
      </div>
-     <div className="relative">
-      <button onClick={()=>setStageLead(stageLead===id?null:id)} className="flex max-w-full items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-2 text-left text-[10px] font-bold text-slate-700"><span className="truncate">{stageLabel(stage)}</span><ChevronDown size={14} className="shrink-0"/></button>
-      {stageLead===id&&<div className="absolute left-0 top-11 z-40 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-       {stageNames.map(s=><button key={s} onClick={()=>updateStage(id,s)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs hover:bg-slate-50 ${s===stage?'font-black text-sky-700':''}`}><span>{stageLabel(s)}</span>{s===stage&&<Check size={14}/>}</button>)}
-       <button onClick={()=>setCustomStageOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-xl border-t px-3 py-3 text-xs font-bold text-sky-700"><Plus size={14}/> Add new stage</button>
-       {customStageOpen&&<div className="mt-2 border-t pt-2"><input autoFocus value={customStage} onChange={e=>setCustomStage(e.target.value)} placeholder="New stage name" className="w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900"/><button onClick={addCustomStage} className="mt-2 w-full rounded-xl bg-sky-600 py-2 text-xs font-bold text-white">ADD STAGE</button></div>}
-      </div>}
-     </div>
-     <div className="w-24 text-right text-xs font-bold">₹{paid(id).toLocaleString('en-IN')}</div>
+     <button title="Edit lead" onClick={()=>setEditLead({...l})} className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-500"><Pencil size={13}/></button>
+     <button title="Delete lead" onClick={()=>deleteOne(id)} className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-400"><Trash2 size={13}/></button>
     </div>
-    {expanded&&<div className="grid grid-cols-2 gap-2 bg-slate-50 px-3 pb-3 pt-2 sm:grid-cols-4 sm:px-4">
-     <Info label="Phone" value={l.phone}/>
+    {expanded&&<div className="grid grid-cols-2 gap-1.5 bg-slate-50 px-3 pb-3 pt-2 sm:grid-cols-4 sm:px-4">
      <Info label="Place" value={[l.area,l.district].filter(Boolean).join(', ')||'—'}/>
-     <Info label="Plant needed" value={l.recommended_kw?`${l.recommended_kw} kW`:'—'}/>
-     <Info label="Date & time" value={`${dateOnly(l.created_at)} · ${timeOnly(l.created_at)}`}/>
-     <Info label="Status" value={l.lead_status||'NEW'}/>
-     <Info label="Source" value={l.source||'web'}/>
-     <Info label="Customer contribution" value={l.customer_contribution?`₹${Number(l.customer_contribution).toLocaleString('en-IN')}`:'—'}/>
-     <div className="col-span-2 rounded-xl bg-white p-2.5"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Lead ID</p><div className="mt-1 flex items-center justify-between gap-2"><p className="break-all text-xs font-bold">{id}</p><div className="flex shrink-0 gap-1"><button title="Edit lead" onClick={()=>setEditLead({...l})} className="grid size-9 place-items-center rounded-xl bg-sky-50 text-sky-700"><Pencil size={16}/></button><button title="Delete lead" onClick={()=>deleteOne(id)} className="grid size-9 place-items-center rounded-xl bg-red-50 text-red-600"><Trash2 size={16}/></button></div></div></div>
-     {paymentLead===id&&<div className="col-span-2 rounded-xl bg-white p-3"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Add payment</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><input type="number" min="1" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value)} placeholder="Amount ₹" className="min-w-0 w-full rounded-xl border p-2.5 text-xs"/><input value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value)} placeholder="Method" className="min-w-0 w-full rounded-xl border p-2.5 text-xs"/><input value={paymentNote} onChange={e=>setPaymentNote(e.target.value)} placeholder="Note" className="min-w-0 w-full rounded-xl border p-2.5 text-xs"/></div><button onClick={()=>addPayment(id)} className="mt-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white">SAVE PAYMENT</button></div>}
-     {paymentLead!==id&&<button onClick={()=>setPaymentLead(id)} className="col-span-2 rounded-xl border border-sky-100 bg-sky-50 py-2 text-xs font-bold text-sky-700">+ Add payment</button>}
-     {stages.filter(x=>x.lead_id===id).length>0&&<div className="col-span-2 rounded-xl bg-white p-3"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Project timeline</p>{stages.filter(x=>x.lead_id===id).sort((a,b)=>new Date(a.stage_at).getTime()-new Date(b.stage_at).getTime()).map((x,i)=><div key={String(x.id||i)} className="mt-2 flex items-start gap-2 text-xs"><span className="mt-1 size-2 rounded-full bg-sky-600"/><div><b>{stageLabel(x.stage)}</b><p className="text-slate-400">{dt(x.stage_at)} · {x.recorded_by_name||'—'}</p></div></div>)}</div>}
+     <Info label="Plant" value={l.recommended_kw?\`${l.recommended_kw} kW\`:'—'}/>
+     <div className="rounded-xl bg-white p-2"><p className="text-[8px] font-bold uppercase tracking-wide text-slate-400">Location</p>{[l.area,l.district].filter(Boolean).length?<a target="_blank" rel="noreferrer" href={\`https://www.google.com/maps/search/?api=1&query=\${encodeURIComponent([l.area,l.district,'Kerala'].filter(Boolean).join(', '))}\`} className="mt-0.5 block text-[10px] font-medium text-sky-600 underline">Open in Maps</a>:<p className="mt-0.5 text-[10px] text-slate-400">—</p>}</div>
+     <Info label="Consumer number" value={l.kseb_consumer_number||'—'}/>
+     <Info label="Feasibility" value={l.feasibility_status||'—'}/>
+     <Info label="Lead ID" value={id}/>
+     <Info label="Created" value={l.created_at?dt(l.created_at):'—'}/>
     </div>}
    </div>
-  )})}</div></>} </section></div>
+  )})}</div></div></>} </section></div>
  {taskModal&&addTaskMode===null&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>setTaskModal(null)} save={saveTask}/>}  {addTaskMode==='CHOOSER'&&<AddTaskChooser close={()=>setAddTaskMode(null)} chooseNew={()=>{setTaskModal({name:'',place:'',number:'',plant:'',stage:'',payment:'',source:'Manual',note:'',task_date:new Date().toISOString().slice(0,10)});setAddTaskMode('NEW')}} chooseExisting={()=>setAddTaskMode('EXISTING')}/>} {addTaskMode==='NEW'&&taskModal&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>{setTaskModal(null);setAddTaskMode(null)}} save={saveNewTask} fixedSource/>} {addTaskMode==='EXISTING'&&<ExistingTaskModal leads={leads} tasks={tasks} close={()=>setAddTaskMode(null)} openTask={(task)=>{setTaskModal(task);setAddTaskMode('NEW')}}/>} {newLeadOpen&&<NewLeadModal form={form} setForm={setForm} close={()=>setNewLeadOpen(false)} create={create}/>}
  {editLead&&<EditLeadModal lead={editLead} setLead={setEditLead} close={()=>setEditLead(null)} save={saveEdit}/>}
  {historyOpen&&<HistoryModal rows={audit} close={()=>setHistoryOpen(false)}/>}
