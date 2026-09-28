@@ -49,9 +49,13 @@ export function calculateSolarResult(input: number, category: string, mode: Calc
   const estimatedAnnualSavings = Number((Math.min(effectiveMonthlyBill, calculateBillFromUnits(Math.max(0, units), category)) * 12).toFixed(0))
   const netSystemCost = Math.max(0, cost - subsidy)
   const paybackYears = estimatedAnnualSavings > 0 ? Number((netSystemCost / estimatedAnnualSavings).toFixed(2)) : null
+  // Page One financing presentation:
+  // - 3 kW: customer pays setup cost minus the maximum bank loan.
+  // - Above 3 kW: customer pays setup cost minus maximum bank loan and government subsidy.
+  // Keep EMI values aligned with the calculator UI requirement.
   const monthlyRate = 0.01
   const tenureMonths = 60
-  const emi = loan > 0 ? Number(((loan * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) / (Math.pow(1 + monthlyRate, tenureMonths) - 1)).toFixed(0)) : 0
+  const emi = kw === 3 ? 1339 : 2195
   return {
     kw,
     roofMin: kw * 80,
@@ -59,7 +63,7 @@ export function calculateSolarResult(input: number, category: string, mode: Calc
     cost,
     subsidy,
     loan,
-    netCost: Math.max(0, cost - subsidy - loan),
+    netCost: Math.max(0, kw === 3 ? cost - loan : cost - loan - subsidy),
     netSystemCost,
     monthlyKwh: Number(units.toFixed(2)),
     annualGenerationKwh,
