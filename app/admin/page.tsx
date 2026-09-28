@@ -52,12 +52,12 @@ export default function Admin(){
  {tab==='TASKS'&&<TaskList tasks={tasks} openTask={(t)=>setTaskModal(t)} addTask={openAddTask} completeTask={completeTask} deleteTask={deleteTask}/>}
  {tab==='LEADS'&&<>
   <div className="mb-3 flex items-center justify-between">
-   <div><h2 className="text-lg font-black">All Leads</h2><p className="text-xs text-slate-500">{leads.length} total leads</p></div>
-   <button onClick={()=>setNewLeadOpen(true)} title="Add new lead" className="grid size-11 place-items-center rounded-full bg-sky-600 text-white shadow-lg shadow-sky-200"><Plus size={23}/></button>
+   <div><h2 className="text-[11px] font-medium text-slate-500">All Leads</h2><p className="text-[9px] text-slate-400">{leads.length} total leads</p></div>
+   <button onClick={()=>setNewLeadOpen(true)} title="Add new lead" className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-500"><Plus size={15}/></button>
   </div>
-  <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
-   <button onClick={()=>setLeadSection('SELECTED')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='SELECTED'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>Selected</button>
-   <button onClick={()=>setLeadSection('ALL')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='ALL'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All</button>
+  <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-50 p-1">
+   <button onClick={()=>setLeadSection('SELECTED')} className={`rounded-lg px-3 py-1.5 text-[9px] font-medium uppercase tracking-wide ${leadSection==='SELECTED'?'bg-white text-slate-500 shadow-sm':'text-slate-400'}`}>Selected</button>
+   <button onClick={()=>setLeadSection('ALL')} className={`rounded-lg px-3 py-1.5 text-[9px] font-medium uppercase tracking-wide ${leadSection==='ALL'?'bg-white text-slate-500 shadow-sm':'text-slate-400'}`}>All</button>
   </div>
   {deleteMode&&selectedIds.length>0&&<div className="mb-3 flex items-center justify-between rounded-2xl bg-red-600 px-4 py-3 text-white"><span className="text-sm font-bold">{selectedIds.length} selected</span><button onClick={deleteSelected} className="rounded-full bg-white px-4 py-2 text-xs font-black text-red-600">DELETE</button></div>}
   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -69,7 +69,7 @@ export default function Admin(){
      return <div key={id} className="border-b last:border-0">
       <div className="grid min-h-14 grid-cols-[1fr_auto_auto] items-center gap-1 px-3 py-1.5 sm:px-4">
        <div className="flex min-w-0 items-center gap-1.5">
-        <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-7 shrink-0 place-items-center rounded-lg hover:bg-amber-50"><span className={`text-base leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
+        <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-7 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-400"><span className={`text-base leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
         <button onClick={()=>setExpandedId(expanded?null:id)} className="min-w-0 text-left">
          <span className="block truncate text-[11px] font-medium text-slate-500">{l.name||'Unnamed lead'}</span>
          <span className="block truncate text-[9px] text-slate-400">{l.phone||'—'}</span>
