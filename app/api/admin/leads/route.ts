@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/adminAuth'
 import { auditEvent } from '@/lib/adminAudit'
 
 function makeLeadId(){const d=new Date().toISOString().slice(0,10).replace(/-/g,'');return `DSN-${d}-${crypto.randomUUID().slice(0,8).toUpperCase()}`}
-const fields=['name','phone','district','area','bill','monthly_kwh','connection_category','recommended_kw','setup_cost','subsidy','financing_amount','customer_contribution','kseb_consumer_number','kseb_district','kseb_section','transformer']
+const fields=['name','phone','district','area','connection_category','recommended_kw','kseb_consumer_number','remaining_transformer_capacity']
 function unauthorized(e:unknown){return e instanceof Error&&e.message==='UNAUTHORIZED'}
 
 export async function GET(){
@@ -23,9 +23,9 @@ export async function GET(){
 export async function POST(request:Request){
  try{
   const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json()
-  if(!String(body.name??'').trim()||!/^\d{10}$/.test(String(body.phone??''))||!String(body.district??'').trim()||!['Domestic','Commercial'].includes(String(body.connection_category??''))) return NextResponse.json({success:false,message:'Name, valid phone, district and category are required.'},{status:400})
+  if(body.phone!=null&&String(body.phone).trim()!==''&&!/^\d{10}$/.test(String(body.phone).replace(/\D/g,''))) return NextResponse.json({success:false,message:'Phone number must contain 10 digits.'},{status:400})
   const leadId=makeLeadId(); const sql=getSql()
-  const numericFields=['bill','monthly_kwh','recommended_kw','setup_cost','subsidy','financing_amount','customer_contribution']
+  const numericFields=['recommended_kw','remaining_transformer_capacity']
   const vals=fields.map(f=>numericFields.includes(f)&&body[f]!==undefined&&body[f]!==null&&String(body[f]).trim()!=='' ? Number(String(body[f]).replace(/,/g,'')) : body[f]??null)
   if(vals.some((v,i)=>numericFields.includes(fields[i])&&v!==null&&(!Number.isFinite(Number(v))))) return NextResponse.json({success:false,message:'Numeric fields contain an invalid value.'},{status:400})
   await sql.query(`INSERT INTO leads (lead_id,${fields.join(',')},source,lead_status) VALUES ($1,${fields.map((_,i)=>'
