@@ -540,15 +540,11 @@ export default function Page() {
               const balanceAvailableKw = Number((feasibilityResult.transformer as { balanceAvailableKw?: number })?.balanceAvailableKw ?? 0)
 
               return (
-                <div className="mt-3 space-y-2 leading-relaxed">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="mt-3 space-y-2 leading-relaxed">
+                  <div className="grid grid-cols-3 gap-2 border-t border-slate-200 pt-2 text-[11px]">
                     <p><strong>Section Office</strong><br />{String((feasibilityResult.section as { name?: string })?.name ?? '')}</p>
                     <p><strong>Transformer</strong><br />{String((feasibilityResult.transformer as { transformerName?: string })?.transformerName ?? '')}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-2">
-                    <span>90% DTR Capacity<br /><strong>{String((feasibilityResult.transformer as { allowedCapacityKw?: number })?.allowedCapacityKw)} kW</strong></span>
-                    <span>Feasibility Issued<br /><strong>{String((feasibilityResult.transformer as { feasibilityIssuedKw?: number })?.feasibilityIssuedKw)} kW</strong></span>
+                    <p><strong>90% DTR Capacity</strong><br /><strong>{String((feasibilityResult.transformer as { allowedCapacityKw?: number })?.allowedCapacityKw)} kW</strong></p>
                   </div>
 
                   <div className="border-t border-slate-200 pt-2 text-center">
