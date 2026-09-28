@@ -83,6 +83,7 @@ export default function Admin(){
         <div className="rounded-lg bg-white p-2"><p className="text-[7px] font-medium uppercase tracking-wide text-slate-400">Location</p>{mapsUrl?<a target="_blank" rel="noreferrer" href={mapsUrl} className="mt-0.5 block text-[9px] font-medium text-slate-500 underline">Open in Maps</a>:<p className="mt-0.5 text-[9px] text-slate-400">—</p>}</div>
         <LeadInfo label="Consumer Number" value={l.kseb_consumer_number||'—'}/>
         <LeadInfo label="Balance Available" value={l.remaining_transformer_capacity!=null?String(l.remaining_transformer_capacity)+' kW':'—'}/>
+        {leadSection==='SELECTED'&&<LeadInfo label="Payment" value={paid(id)>0?'₹'+paid(id).toLocaleString('en-IN'):'—'}/>}
        </div>
        <p className="mt-2 border-t border-slate-200 pt-2 text-[7px] leading-tight text-slate-400">{id} · {l.created_at?dt(l.created_at):'—'}</p>
       </div>}
