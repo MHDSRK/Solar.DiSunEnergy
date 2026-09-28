@@ -16,7 +16,7 @@ export async function GET(){
 
 export async function POST(request:Request){
  try{
-  const actor=await requireAdmin(); await ensureLeadTable(); const b=await request.json()
+  const actor=await requireAdmin(); await ensureLeadTable(); await ensureAdminTasksTable(); const b=await request.json()
   const name=String(b.name??'').trim()
   const taskDate=String(b.taskDate??'').trim()
   if(!name||!/^\d{4}-\d{2}-\d{2}$/.test(taskDate)) return NextResponse.json({success:false,message:'Task name and date are required.'},{status:400})
