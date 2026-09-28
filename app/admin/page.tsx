@@ -48,33 +48,48 @@ export default function Admin(){
  <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6"><div className="relative flex min-h-10 items-center justify-center"><h1 className="text-xl font-black sm:text-2xl">Admin Panel</h1><div className="absolute right-0 flex items-center gap-2"><span className="text-xs font-bold text-slate-700 sm:text-sm">{session.name}</span><button onClick={async()=>{await fetch('/api/admin/logout',{method:'POST'});location.reload()}} className="rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white">Logout</button></div></div><nav className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1"><button onClick={()=>setTab('TASKS')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='TASKS'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>TO DO LIST<span className="ml-1 text-[10px] opacity-60">({tasks.filter(x=>x.status!=='DONE').length})</span></button><button onClick={()=>setTab('LEADS')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='LEADS'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All Leads<span className="ml-1 text-[10px] opacity-60">({leads.length})</span></button></nav></header>
  <section className="px-3 py-3 sm:px-6">{notice&&<div className="mb-3 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={16}/></button></div>}
  {tab==='TASKS'&&<TaskList tasks={tasks} openTask={(t)=>setTaskModal(t)} addTask={openAddTask} completeTask={completeTask} deleteTask={deleteTask}/>}
- {tab==='LEADS'&&<><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2">{deleteMode&&<button title="Select all" onClick={toggleAll} className="grid size-9 place-items-center rounded-xl border bg-white">{allSelected?<Check size={17}/>:<span className="text-sm">□</span>}</button>}<div><h2 className="text-lg font-black">All Leads</h2><p className="text-xs text-slate-500">{leads.length} total leads</p></div></div><button onClick={()=>setNewLeadOpen(true)} title="Add new lead" className="grid size-11 place-items-center rounded-full bg-sky-600 text-white shadow-lg shadow-sky-200"><Plus size={23}/></button></div>
- {deleteMode&&selectedIds.length>0&&<div className="sticky top-[126px] z-20 mb-3 flex items-center justify-between rounded-2xl bg-red-600 px-4 py-3 text-white shadow-lg"><span className="text-sm font-bold">{selectedIds.length} selected</span><button onClick={deleteSelected} className="rounded-full bg-white px-4 py-2 text-xs font-black text-red-600">DELETE</button></div>}
- <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1"><button onClick={()=>setLeadSection('SELECTED')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='SELECTED'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>Selected</button><button onClick={()=>setLeadSection('ALL')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='ALL'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All</button></div>
- <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
- {((leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads)).length===0&&<div className="p-8 text-center text-xs text-slate-400">{leadSection==='SELECTED'?'No selected leads.':'No leads yet.'}</div>}
- {(leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads).map(l=>{const id=String(l.lead_id),expanded=expandedId===id;return (
-   <div key={id} className="border-b last:border-0">
-    <div className="grid min-h-14 grid-cols-[1fr_auto_auto] items-center gap-1 px-3 py-1.5 sm:grid-cols-[1fr_auto_auto] sm:px-4">
-     <div className="flex min-w-0 items-center gap-1.5">
-      <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-7 shrink-0 place-items-center rounded-lg hover:bg-amber-50"><span className={`text-base leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
-      <button onClick={()=>setExpandedId(expanded?null:id)} className="min-w-0 text-left"><span className="block truncate text-[11px] font-medium text-slate-500">{l.name||'Unnamed lead'}</span><span className="block truncate text-[9px] font-normal text-slate-400">{l.phone||'—'}</span></button>
+ {tab==='LEADS'&&<>
+  <div className="mb-3 flex items-center justify-between">
+   <div><h2 className="text-lg font-black">All Leads</h2><p className="text-xs text-slate-500">{leads.length} total leads</p></div>
+   <button onClick={()=>setNewLeadOpen(true)} title="Add new lead" className="grid size-11 place-items-center rounded-full bg-sky-600 text-white shadow-lg shadow-sky-200"><Plus size={23}/></button>
+  </div>
+  <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+   <button onClick={()=>setLeadSection('SELECTED')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='SELECTED'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>Selected</button>
+   <button onClick={()=>setLeadSection('ALL')} className={`rounded-xl px-3 py-2 text-xs font-bold ${leadSection==='ALL'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All</button>
+  </div>
+  {deleteMode&&selectedIds.length>0&&<div className="mb-3 flex items-center justify-between rounded-2xl bg-red-600 px-4 py-3 text-white"><span className="text-sm font-bold">{selectedIds.length} selected</span><button onClick={deleteSelected} className="rounded-full bg-white px-4 py-2 text-xs font-black text-red-600">DELETE</button></div>}
+  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+   {(() => {
+    const visibleLeads=leadSection==='SELECTED'?leads.filter(l=>selectedIds.includes(String(l.lead_id))):leads
+    return visibleLeads.length===0?<div className="p-8 text-center text-xs text-slate-400">{leadSection==='SELECTED'?'No selected leads.':'No leads yet.'}</div>:visibleLeads.map(l=>{
+     const id=String(l.lead_id), expanded=expandedId===id, place=[l.area,l.district].filter(Boolean).join(', ')
+     const mapsUrl=place?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place+', Kerala')}`:null
+     return <div key={id} className="border-b last:border-0">
+      <div className="grid min-h-14 grid-cols-[1fr_auto_auto] items-center gap-1 px-3 py-1.5 sm:px-4">
+       <div className="flex min-w-0 items-center gap-1.5">
+        <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-7 shrink-0 place-items-center rounded-lg hover:bg-amber-50"><span className={`text-base leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
+        <button onClick={()=>setExpandedId(expanded?null:id)} className="min-w-0 text-left">
+         <span className="block truncate text-[11px] font-medium text-slate-500">{l.name||'Unnamed lead'}</span>
+         <span className="block truncate text-[9px] text-slate-400">{l.phone||'—'}</span>
+        </button>
+       </div>
+       <button title="Edit lead" onClick={()=>setEditLead({...l})} className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-500"><Pencil size={13}/></button>
+       <button title="Delete lead" onClick={()=>deleteOne(id)} className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-400"><Trash2 size={13}/></button>
+      </div>
+      {expanded&&<div className="grid grid-cols-2 gap-1.5 bg-slate-50 px-3 pb-3 pt-2 sm:grid-cols-4 sm:px-4">
+       <LeadInfo label="Place" value={place||'—'}/>
+       <LeadInfo label="Plant" value={l.recommended_kw?`${l.recommended_kw} kW`:'—'}/>
+       <div className="rounded-lg bg-white p-2"><p className="text-[7px] font-medium uppercase tracking-wide text-slate-400">Location</p>{mapsUrl?<a target="_blank" rel="noreferrer" href={mapsUrl} className="mt-0.5 block text-[10px] font-medium text-sky-600 underline">Open in Maps</a>:<p className="mt-0.5 text-[10px] text-slate-400">—</p>}</div>
+       <LeadInfo label="Consumer Number" value={l.kseb_consumer_number||'—'}/>
+       <LeadInfo label="Feasibility" value={l.feasibility_status||'—'}/>
+       <LeadInfo label="Lead ID" value={id}/>
+       <LeadInfo label="Lead Created" value={l.created_at?dt(l.created_at):'—'}/>
+      </div>}
      </div>
-     <button title="Edit lead" onClick={()=>setEditLead({...l})} className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-500"><Pencil size={13}/></button>
-     <button title="Delete lead" onClick={()=>deleteOne(id)} className="grid size-8 place-items-center rounded-lg bg-slate-50 text-slate-400"><Trash2 size={13}/></button>
-    </div>
-    {expanded&&<div className="grid grid-cols-2 gap-1.5 bg-slate-50 px-3 pb-3 pt-2 sm:grid-cols-4 sm:px-4">
-     <Info label="Place" value={[l.area,l.district].filter(Boolean).join(', ')||'—'}/>
-     <LeadInfo label="Plant" value={l.recommended_kw?`${l.recommended_kw} kW`:'—'}/>
-     <div className="rounded-xl bg-white p-2"><p className="text-[8px] font-bold uppercase tracking-wide text-slate-400">Location</p>{[l.area,l.district].filter(Boolean).length?<a target="_blank" rel="noreferrer" href={\`https://www.google.com/maps/search/?api=1&query=\${encodeURIComponent([l.area,l.district,'Kerala'].filter(Boolean).join(', '))}\`} className="mt-0.5 block text-[10px] font-medium text-sky-600 underline">Open in Maps</a>:<p className="mt-0.5 text-[10px] text-slate-400">—</p>}</div>
-     <LeadInfo label="Consumer Number" value={l.kseb_consumer_number||'—'}/>
-     <LeadInfo label="Feasibility" value={l.feasibility_status||'—'}/>
-     <LeadInfo label="Lead ID" value={id}/>
-     <LeadInfo label="Lead Created" value={l.created_at?dt(l.created_at):'—'}/>
-    </div>}
-   </div>
-  )})}</div></div></>} </section></div>
- {taskModal&&addTaskMode===null&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>setTaskModal(null)} save={saveTask}/>}  {addTaskMode==='CHOOSER'&&<AddTaskChooser close={()=>setAddTaskMode(null)} chooseNew={()=>{setTaskModal({name:'',place:'',number:'',plant:'',stage:'',payment:'',source:'Manual',note:'',task_date:new Date().toISOString().slice(0,10)});setAddTaskMode('NEW')}} chooseExisting={()=>setAddTaskMode('EXISTING')}/>} {addTaskMode==='NEW'&&taskModal&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>{setTaskModal(null);setAddTaskMode(null)}} save={saveNewTask} fixedSource/>} {addTaskMode==='EXISTING'&&<ExistingTaskModal leads={leads} tasks={tasks} close={()=>setAddTaskMode(null)} openTask={(task)=>{setTaskModal(task);setAddTaskMode('NEW')}}/>} {newLeadOpen&&<NewLeadModal form={form} setForm={setForm} close={()=>setNewLeadOpen(false)} create={create}/>}
+    })
+   })()}
+  </div>
+ </>} {taskModal&&addTaskMode===null&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>setTaskModal(null)} save={saveTask}/>}  {addTaskMode==='CHOOSER'&&<AddTaskChooser close={()=>setAddTaskMode(null)} chooseNew={()=>{setTaskModal({name:'',place:'',number:'',plant:'',stage:'',payment:'',source:'Manual',note:'',task_date:new Date().toISOString().slice(0,10)});setAddTaskMode('NEW')}} chooseExisting={()=>setAddTaskMode('EXISTING')}/>} {addTaskMode==='NEW'&&taskModal&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>{setTaskModal(null);setAddTaskMode(null)}} save={saveNewTask} fixedSource/>} {addTaskMode==='EXISTING'&&<ExistingTaskModal leads={leads} tasks={tasks} close={()=>setAddTaskMode(null)} openTask={(task)=>{setTaskModal(task);setAddTaskMode('NEW')}}/>} {newLeadOpen&&<NewLeadModal form={form} setForm={setForm} close={()=>setNewLeadOpen(false)} create={create}/>}
  {editLead&&<EditLeadModal lead={editLead} setLead={setEditLead} close={()=>setEditLead(null)} save={saveEdit}/>}
  {historyOpen&&<HistoryModal rows={audit} close={()=>setHistoryOpen(false)}/>}
  </main>
