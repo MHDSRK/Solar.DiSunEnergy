@@ -28,10 +28,22 @@ export async function POST(request:Request){
   const numericFields=['bill','monthly_kwh','recommended_kw','setup_cost','subsidy','financing_amount','customer_contribution']
   const vals=fields.map(f=>numericFields.includes(f)&&body[f]!==undefined&&body[f]!==null&&String(body[f]).trim()!=='' ? Number(String(body[f]).replace(/,/g,'')) : body[f]??null)
   if(vals.some((v,i)=>numericFields.includes(fields[i])&&v!==null&&(!Number.isFinite(Number(v))))) return NextResponse.json({success:false,message:'Numeric fields contain an invalid value.'},{status:400})
-  await sql.query(`INSERT INTO leads (lead_id,${fields.join(',')},source,lead_status) VALUES ($1,${fields.map((_,i)=>'$'+(i+2)).join(',')},'manual','NEW')`,[leadId,...vals])
-  await auditEvent(leadId,'source',`created via manual entry by ${actor.name}`,actor)
+  await sql.query(`INSERT INTO leads (lead_id,${fields.join(',')},source,lead_status) VALUES ($1,${fields.map((_,i)=>'
+}
+export async function DELETE(request:Request){
+ try{
+  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json(); const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
+  if(!ids.length) return NextResponse.json({success:false,message:'No leads selected.'},{status:400})
+  const rows=(await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`) as Record<string,any>[]
+  for(const row of rows) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
+  await getSql()`DELETE FROM leads WHERE lead_id = ANY(${ids}::text[])`
+  return NextResponse.json({success:true,deleted:rows.length})
+ }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to delete leads.'},{status:unauthorized(e)?401:500})}
+}
++(i+2)).join(',')},'manual','NEW')`,[leadId,...vals])
+  try{await auditEvent(leadId,'source',`created via manual entry by ${actor.name}`,actor)}catch{}
   return NextResponse.json({success:true,leadId})
- }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to create lead.'},{status:unauthorized(e)?401:500})}
+ }catch(e){const message=e instanceof Error?e.message:'Unable to create lead.';return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':message},{status:unauthorized(e)?401:500})}
 }
 export async function DELETE(request:Request){
  try{
