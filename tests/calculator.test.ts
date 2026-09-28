@@ -29,3 +29,22 @@ test('commercial systems have no central subsidy', () => {
 test('bill conversion remains monotonic', () => {
   assert.ok(calculateBillFromUnits(500, 'Domestic') < calculateBillFromUnits(600, 'Domestic'))
 })
+
+test('Page One financing rule for 3 kW excludes subsidy from out-of-pocket cost', () => {
+  const r = calculateSolarResult(300, 'Domestic', 'units')
+  assert.equal(r.kw, 3)
+  assert.equal(r.cost, 220000)
+  assert.equal(r.loan, 200000)
+  assert.equal(r.netCost, 20000)
+  assert.equal(r.loanAssumption.estimatedEmi, 1339)
+})
+
+test('Page One financing rule above 3 kW subtracts loan and subsidy', () => {
+  const r = calculateSolarResult(600, 'Domestic', 'units')
+  assert.equal(r.kw, 5)
+  assert.equal(r.cost, 325000)
+  assert.equal(r.loan, 200000)
+  assert.equal(r.subsidy, 78000)
+  assert.equal(r.netCost, 47000)
+  assert.equal(r.loanAssumption.estimatedEmi, 2195)
+})
