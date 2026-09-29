@@ -41,6 +41,22 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (body?.object !== 'whatsapp_business_account') {
+      return NextResponse.json({ success: false, message: 'Unsupported webhook object.' }, { status: 400 })
+    }
+
+    const expectedPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim()
+    if (expectedPhoneNumberId) {
+      for (const entry of Array.isArray(body?.entry) ? body.entry : []) {
+        for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
+          const receivedPhoneNumberId = String(change?.value?.metadata?.phone_number_id || '')
+          if (receivedPhoneNumberId && receivedPhoneNumberId !== expectedPhoneNumberId) {
+            return NextResponse.json({ success: false, message: 'Webhook phone number mismatch.' }, { status: 400 })
+          }
+        }
+      }
+    }
+
     const messages = parseWhatsAppInbound(body)
     const statuses = parseWhatsAppStatuses(body)
 
