@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
+
 export type WhatsAppInboundMessage = {
   messageId: string
   from: string
@@ -82,7 +83,7 @@ export async function linkWhatsAppContactToLead(phone: string) {
   if (!normalized) return
   const sql = await getDb()
   await sql.query(
-    "UPDATE whatsapp_contacts SET lead_id = (SELECT lead_id FROM leads WHERE regexp_replace(COALESCE(phone, ''), '\\\\D', '', 'g') = $1 ORDER BY updated_at DESC LIMIT 1), updated_at = NOW() WHERE phone = $1",
+    "UPDATE whatsapp_contacts SET lead_id = (SELECT lead_id FROM leads WHERE regexp_replace(COALESCE(phone, ''), $$\\D$$, '', 'g') = $1 ORDER BY updated_at DESC LIMIT 1), updated_at = NOW() WHERE phone = $1",
     [normalized],
   )
 }
@@ -123,7 +124,7 @@ export function parseWhatsAppStatuses(body: any) {
 export async function updateWhatsAppStatus(status: { messageId: string; status: string; timestamp: string | null; recipient: string | null; raw: unknown }) {
   const sql = await getDb()
   await sql.query(
-    'UPDATE whatsapp_messages SET delivery_status = $1, delivered_at = CASE WHEN $1 = \\'delivered\\' THEN COALESCE(delivered_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE delivered_at END, read_at = CASE WHEN $1 = \\'read\\' THEN COALESCE(read_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE read_at END, failed_at = CASE WHEN $1 = \\'failed\\' THEN COALESCE(failed_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE failed_at END, error_payload = CASE WHEN $1 = \\'failed\\' THEN $3::jsonb ELSE error_payload END, updated_at = NOW() WHERE whatsapp_message_id = $4',
+    "UPDATE whatsapp_messages SET delivery_status = $1, delivered_at = CASE WHEN $1 = $$delivered$$ THEN COALESCE(delivered_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE delivered_at END, read_at = CASE WHEN $1 = $$read$$ THEN COALESCE(read_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE read_at END, failed_at = CASE WHEN $1 = $$failed$$ THEN COALESCE(failed_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE failed_at END, error_payload = CASE WHEN $1 = $$failed$$ THEN $3::jsonb ELSE error_payload END, updated_at = NOW() WHERE whatsapp_message_id = $4",
     [status.status, status.timestamp || '0', JSON.stringify(status.raw), status.messageId],
   )
 }
