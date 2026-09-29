@@ -1,6 +1,4 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { getSql } from '@/lib/db'
-
 export type WhatsAppInboundMessage = {
   messageId: string
   from: string
@@ -43,10 +41,14 @@ function extractMessage(message: any): WhatsAppInboundMessage {
   }
 }
 
+async function getDb() {
+  return (await import('@/lib/db')).getSql()
+}
+
 export async function storeWhatsAppMessage(message: WhatsAppInboundMessage) {
   if (!message.messageId || !message.from) return { stored: false, duplicate: false }
 
-  const sql = getSql()
+  const sql = await getDb()
   const contacts = await sql.query(
     'INSERT INTO whatsapp_contacts (phone, updated_at) VALUES ($1, NOW()) ON CONFLICT (phone) DO UPDATE SET updated_at = NOW() RETURNING id',
     [message.from],
@@ -78,7 +80,8 @@ export async function storeWhatsAppMessage(message: WhatsAppInboundMessage) {
 export async function linkWhatsAppContactToLead(phone: string) {
   const normalized = normalizePhone(phone)
   if (!normalized) return
-  await getSql().query(
+  const sql = await getDb()
+  await sql.query(
     "UPDATE whatsapp_contacts SET lead_id = (SELECT lead_id FROM leads WHERE regexp_replace(COALESCE(phone, ''), '\\\\D', '', 'g') = $1 ORDER BY updated_at DESC LIMIT 1), updated_at = NOW() WHERE phone = $1",
     [normalized],
   )
@@ -118,7 +121,8 @@ export function parseWhatsAppStatuses(body: any) {
 }
 
 export async function updateWhatsAppStatus(status: { messageId: string; status: string; timestamp: string | null; recipient: string | null; raw: unknown }) {
-  await getSql().query(
+  const sql = await getDb()
+  await sql.query(
     'UPDATE whatsapp_messages SET delivery_status = $1, delivered_at = CASE WHEN $1 = \\'delivered\\' THEN COALESCE(delivered_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE delivered_at END, read_at = CASE WHEN $1 = \\'read\\' THEN COALESCE(read_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE read_at END, failed_at = CASE WHEN $1 = \\'failed\\' THEN COALESCE(failed_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE failed_at END, error_payload = CASE WHEN $1 = \\'failed\\' THEN $3::jsonb ELSE error_payload END, updated_at = NOW() WHERE whatsapp_message_id = $4',
     [status.status, status.timestamp || '0', JSON.stringify(status.raw), status.messageId],
   )
