@@ -10,6 +10,8 @@ export function getProductionChecks(env = process.env): ProductionCheck[] {
     { name: 'GOOGLE_SERVICE_ACCOUNT_JSON', configured: Boolean(env.GOOGLE_SERVICE_ACCOUNT_JSON) },
     { name: 'WHATSAPP_ACCESS_TOKEN', configured: Boolean(env.WHATSAPP_ACCESS_TOKEN) },
     { name: 'WHATSAPP_PHONE_NUMBER_ID', configured: Boolean(env.WHATSAPP_PHONE_NUMBER_ID) },
+    { name: 'WHATSAPP_APP_SECRET', configured: Boolean(env.WHATSAPP_APP_SECRET) },
+    { name: 'WHATSAPP_WEBHOOK_VERIFY_TOKEN', configured: Boolean(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) },
     { name: 'WHATSAPP_RECIPIENT', configured: Boolean(env.WHATSAPP_RECIPIENT) },
   ]
 }
