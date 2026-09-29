@@ -37,6 +37,40 @@ const migrations = [
 ]
 
 for (const statement of migrations) await sql.unsafe(statement)
-await sql`UPDATE lead_followups SET status = 'PENDING', reminder_sent_at = COALESCE(reminder_sent_at, NOW()) WHERE status = 'REMINDER_SENT'`
-console.log(`Applied ${migrations.length + 1} database migration statements.`)
+
+const requiredTables = [
+  'leads',
+  'lead_followups',
+  'whatsapp_contacts',
+  'whatsapp_conversations',
+  'whatsapp_messages',
+]
+
+const tableRows = await sql`
+  SELECT table_name
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+`
+
+const existingTables = new Set(tableRows.map((row) => row.table_name))
+const missingTables = requiredTables.filter((tableName) => !existingTables.has(tableName))
+
+if (missingTables.length > 0) {
+  throw new Error(`Database migration incomplete. Missing required tables: ${missingTables.join(', ')}`)
+}
+
+const leadFollowupsExists = await sql`
+  SELECT to_regclass('public.lead_followups') AS table_name
+`
+
+if (leadFollowupsExists[0]?.table_name) {
+  await sql`
+    UPDATE public.lead_followups
+    SET status = 'PENDING',
+        reminder_sent_at = COALESCE(reminder_sent_at, NOW())
+    WHERE status = 'REMINDER_SENT'
+  `
+}
+
+console.log(`Database migration verified successfully. Applied ${migrations.length} schema statements and confirmed all required tables.`)
 process.exit(0)
