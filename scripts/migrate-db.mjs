@@ -32,7 +32,8 @@ const migrations = [
   `CREATE TABLE IF NOT EXISTS whatsapp_messages (id BIGSERIAL PRIMARY KEY, conversation_id BIGINT NOT NULL REFERENCES whatsapp_conversations(id) ON DELETE CASCADE, whatsapp_message_id TEXT NOT NULL UNIQUE, direction TEXT NOT NULL CHECK (direction IN ('INBOUND','OUTBOUND')), message_type TEXT NOT NULL, body TEXT, media_id TEXT, caption TEXT, delivery_status TEXT NOT NULL DEFAULT 'accepted', sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), delivered_at TIMESTAMPTZ, read_at TIMESTAMPTZ, failed_at TIMESTAMPTZ, error_payload JSONB, raw_payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE INDEX IF NOT EXISTS whatsapp_messages_conversation_idx ON whatsapp_messages (conversation_id, sent_at DESC)`,
   `CREATE INDEX IF NOT EXISTS whatsapp_contacts_lead_idx ON whatsapp_contacts (lead_id)`,
-  `CREATE INDEX IF NOT EXISTS whatsapp_messages_status_idx ON whatsapp_messages (delivery_status)`,\n  `ALTER TABLE whatsapp_messages ALTER COLUMN delivery_status SET DEFAULT 'accepted'`,
+  `CREATE INDEX IF NOT EXISTS whatsapp_messages_status_idx ON whatsapp_messages (delivery_status)`,
+  `ALTER TABLE whatsapp_messages ALTER COLUMN delivery_status SET DEFAULT 'accepted'`,
 
 ]
 
