@@ -51,9 +51,74 @@ async function getDb() {
   return (await import('@/lib/db')).getSql()
 }
 
+let whatsappSchemaPromise: Promise<void> | null = null
+
+async function ensureWhatsAppSchema() {
+  if (whatsappSchemaPromise) return whatsappSchemaPromise
+  whatsappSchemaPromise = (async () => {
+    const sql = await getDb()
+    await sql`CREATE TABLE IF NOT EXISTS whatsapp_contacts (
+      id BIGSERIAL PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      lead_id TEXT REFERENCES leads(lead_id) ON DELETE SET NULL,
+      display_name TEXT,
+      profile_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+    await sql`CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+      id BIGSERIAL PRIMARY KEY,
+      contact_id BIGINT NOT NULL UNIQUE REFERENCES whatsapp_contacts(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      unread_count INTEGER NOT NULL DEFAULT 0,
+      last_message_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+    await sql`CREATE TABLE IF NOT EXISTS whatsapp_messages (
+      id BIGSERIAL PRIMARY KEY,
+      conversation_id BIGINT NOT NULL REFERENCES whatsapp_conversations(id) ON DELETE CASCADE,
+      whatsapp_message_id TEXT NOT NULL UNIQUE,
+      direction TEXT NOT NULL CHECK (direction IN ('INBOUND','OUTBOUND')),
+      message_type TEXT NOT NULL,
+      body TEXT,
+      media_id TEXT,
+      caption TEXT,
+      delivery_status TEXT NOT NULL DEFAULT 'accepted',
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      delivered_at TIMESTAMPTZ,
+      read_at TIMESTAMPTZ,
+      failed_at TIMESTAMPTZ,
+      error_payload JSONB,
+      raw_payload JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS media_id TEXT`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS caption TEXT`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'accepted'`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS failed_at TIMESTAMPTZ`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS error_payload JSONB`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+    await sql`CREATE INDEX IF NOT EXISTS whatsapp_messages_conversation_idx ON whatsapp_messages (conversation_id, sent_at DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS whatsapp_messages_status_idx ON whatsapp_messages (delivery_status)`
+    await sql`CREATE INDEX IF NOT EXISTS whatsapp_contacts_lead_idx ON whatsapp_contacts (lead_id)`
+  })().catch((error) => {
+    whatsappSchemaPromise = null
+    throw error
+  })
+  return whatsappSchemaPromise
+}
+
 export async function storeWhatsAppMessage(message: WhatsAppInboundMessage) {
   if (!message.messageId || !message.from) return { stored: false, duplicate: false }
 
+  await ensureWhatsAppSchema()
   const sql = await getDb()
   const contacts = await sql.query(
     'INSERT INTO whatsapp_contacts (phone, updated_at) VALUES ($1, NOW()) ON CONFLICT (phone) DO UPDATE SET updated_at = NOW() RETURNING id',
@@ -110,6 +175,7 @@ export async function linkWhatsAppContactToLead(phone: string) {
 }
 
 export async function ensureWhatsAppConversation(phone: string, leadId?: string | null) {
+  await ensureWhatsAppSchema()
   const normalized = normalizeWhatsAppPhone(phone)
   if (!normalized) throw new Error('Lead does not have a valid WhatsApp phone number.')
 
@@ -148,6 +214,7 @@ export async function storeWhatsAppOutboundMessage(input: {
   rawPayload: unknown
   deliveryStatus?: string
 }) {
+  await ensureWhatsAppSchema()
   const sql = await getDb()
   const rows = await sql.query(
     `INSERT INTO whatsapp_messages
@@ -206,6 +273,7 @@ export function parseWhatsAppStatuses(body: any) {
 }
 
 export async function updateWhatsAppStatus(status: { messageId: string; status: string; timestamp: string | null; recipient: string | null; raw: unknown }) {
+  await ensureWhatsAppSchema()
   const sql = await getDb()
   const rows = await sql.query(
     `UPDATE whatsapp_messages
