@@ -125,6 +125,156 @@ export async function sendWhatsAppLeadTemplate(lead: Record<string, unknown>): P
   return sendTemplate(lead)
 }
 
+export async function sendWhatsAppTextMessage(
+  lead: Record<string, unknown>,
+  body: string,
+): Promise<WhatsAppResult> {
+  const current = config()
+  if (!current) return { configured: false, sent: false }
+  const recipient = normalizeWhatsAppPhone(String(lead.phone || ''))
+  const messageBody = body.trim()
+  if (!recipient || recipient.length < 11) throw new Error('Lead does not have a valid WhatsApp phone number.')
+  if (!messageBody) throw new Error('Message text is required.')
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: recipient,
+    type: 'text',
+    text: { preview_url: true, body: messageBody },
+  }
+
+  const response = await fetch(
+    'https://graph.facebook.com/' + current.version + '/' + current.phoneNumberId + '/messages',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + current.accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    },
+  )
+
+  const details = await response.text()
+  if (!response.ok) {
+    let apiCode: string | undefined
+    try {
+      const parsed = JSON.parse(details) as { error?: { code?: number | string } }
+      if (parsed.error?.code !== undefined) apiCode = String(parsed.error.code)
+    } catch {}
+    const error = new Error('WhatsApp text message failed (' + response.status + '): ' + details.slice(0, 1000)) as Error & { whatsappCode?: string }
+    error.whatsappCode = apiCode
+    throw error
+  }
+
+  let data: { messages?: Array<{ id?: string }> } = {}
+  try { data = JSON.parse(details) as typeof data } catch {}
+  const messageId = data.messages?.[0]?.id
+  if (!messageId) throw new Error('WhatsApp text message was accepted but returned no message ID.')
+
+  const conversation = await ensureWhatsAppConversation(recipient, String(lead.lead_id || ''))
+  await storeWhatsAppOutboundMessage({
+    conversationId: conversation.conversationId,
+    messageId,
+    messageType: 'text',
+    body: messageBody,
+    deliveryStatus: 'accepted',
+    rawPayload: { request: payload, response: data },
+  })
+
+  return { configured: true, sent: true, messageId, recipient }
+}
+
+export async function sendWhatsAppPdf(
+  lead: Record<string, unknown>,
+  file: Blob & { name?: string },
+  caption?: string,
+): Promise<WhatsAppResult> {
+  const current = config()
+  if (!current) return { configured: false, sent: false }
+  const recipient = normalizeWhatsAppPhone(String(lead.phone || ''))
+  if (!recipient || recipient.length < 11) throw new Error('Lead does not have a valid WhatsApp phone number.')
+  if (file.type !== 'application/pdf') throw new Error('Only PDF files can be sent through this action.')
+  const filename = String(file.name || 'DiSun-Solar-Proposal.pdf').trim() || 'DiSun-Solar-Proposal.pdf'
+
+  const mediaForm = new FormData()
+  mediaForm.append('messaging_product', 'whatsapp')
+  mediaForm.append('file', file, filename)
+
+  const uploadResponse = await fetch(
+    'https://graph.facebook.com/' + current.version + '/' + current.phoneNumberId + '/media',
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + current.accessToken },
+      body: mediaForm,
+      cache: 'no-store',
+    },
+  )
+  const uploadDetails = await uploadResponse.text()
+  if (!uploadResponse.ok) {
+    throw new Error('WhatsApp PDF upload failed (' + uploadResponse.status + '): ' + uploadDetails.slice(0, 1000))
+  }
+
+  let uploadData: { id?: string } = {}
+  try { uploadData = JSON.parse(uploadDetails) as typeof uploadData } catch {}
+  if (!uploadData.id) throw new Error('WhatsApp PDF upload succeeded but returned no media ID.')
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: recipient,
+    type: 'document',
+    document: {
+      id: uploadData.id,
+      caption: caption?.trim() || undefined,
+      filename,
+    },
+  }
+
+  const response = await fetch(
+    'https://graph.facebook.com/' + current.version + '/' + current.phoneNumberId + '/messages',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + current.accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    },
+  )
+  const details = await response.text()
+  if (!response.ok) {
+    let apiCode: string | undefined
+    try {
+      const parsed = JSON.parse(details) as { error?: { code?: number | string } }
+      if (parsed.error?.code !== undefined) apiCode = String(parsed.error.code)
+    } catch {}
+    const error = new Error('WhatsApp PDF message failed (' + response.status + '): ' + details.slice(0, 1000)) as Error & { whatsappCode?: string }
+    error.whatsappCode = apiCode
+    throw error
+  }
+
+  let data: { messages?: Array<{ id?: string }> } = {}
+  try { data = JSON.parse(details) as typeof data } catch {}
+  const messageId = data.messages?.[0]?.id
+  if (!messageId) throw new Error('WhatsApp PDF message was accepted but returned no message ID.')
+
+  const conversation = await ensureWhatsAppConversation(recipient, String(lead.lead_id || ''))
+  await storeWhatsAppOutboundMessage({
+    conversationId: conversation.conversationId,
+    messageId,
+    messageType: 'document',
+    body: caption?.trim() || filename,
+    rawPayload: { request: payload, response: data, mediaId: uploadData.id, filename },
+    deliveryStatus: 'accepted',
+  })
+
+  return { configured: true, sent: true, messageId, recipient }
+}
+
 export async function sendWhatsAppFollowupReminder(followup: Record<string, unknown>): Promise<WhatsAppResult> {
   const current = config()
   if (!current) return { configured: false, sent: false }
