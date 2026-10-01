@@ -126,12 +126,70 @@ export async function sendWhatsAppLeadTemplate(lead: Record<string, unknown>): P
 }
 
 export async function sendWhatsAppFollowupReminder(followup: Record<string, unknown>): Promise<WhatsAppResult> {
+  const current = config()
+  if (!current) return { configured: false, sent: false }
+
+  const recipient = normalizeWhatsAppPhone(String(followup.phone || ''))
+  if (!recipient || recipient.length < 11) {
+    throw new Error('Follow-up does not have a valid WhatsApp phone number.')
+  }
+
   const templateName = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME?.trim() || 'disun_followup_reminder'
   const templateLanguage = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE?.trim() || 'en_US'
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: recipient,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: templateLanguage },
+      components: [{
+        type: 'body',
+        parameters: [
+          { type: 'text', text: format(followup.name) },
+          { type: 'text', text: formatFollowupDateTime(followup.follow_up_at) },
+          { type: 'text', text: format(followup.note) },
+        ],
+      }],
+    },
+  }
 
-  return sendTemplate(followup, {
-    templateName,
-    templateLanguage,
-    imageUrl: process.env.WHATSAPP_FOLLOWUP_TEMPLATE_IMAGE_URL?.trim(),
+  const response = await fetch(
+    `https://graph.facebook.com/${current.version}/${current.phoneNumberId}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${current.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    },
+  )
+
+  const details = await response.text()
+  if (!response.ok) {
+    throw new Error(`WhatsApp follow-up reminder failed (${response.status}): ${details.slice(0, 1000)}`)
+  }
+
+  let data: { messages?: Array<{ id?: string }> } = {}
+  try {
+    data = JSON.parse(details) as typeof data
+  } catch {}
+
+  const messageId = data.messages?.[0]?.id
+  if (!messageId) throw new Error('WhatsApp follow-up accepted the request but returned no message ID.')
+
+  const conversation = await ensureWhatsAppConversation(recipient, String(followup.lead_id || ''))
+  await storeWhatsAppOutboundMessage({
+    conversationId: conversation.conversationId,
+    messageId,
+    messageType: 'template',
+    body: null,
+    deliveryStatus: 'accepted',
+    rawPayload: { request: payload, response: data },
   })
+
+  return { configured: true, sent: true, messageId, recipient }
 }
