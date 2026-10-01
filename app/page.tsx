@@ -44,6 +44,7 @@ export default function Page() {
   const sheetRef = useRef<HTMLElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
   const [result, setResult] = useState<{ kw: number; roofMin: number; roofMax: number; cost: number; subsidy: number; loan: number; netCost: number; monthlyKwh: number; loanAssumption?: { estimatedEmi: number } } | null>(null)
+  const leadCreationRef = useRef<Promise<boolean> | null>(null)
   useEffect(() => {
     void createLead()
   }, [])
@@ -108,10 +109,12 @@ export default function Page() {
 
   const calculateResult = () => calculateSolarResult(Number(form.bill), form.category, calculationMode)
   const createLead = async () => {
-    if (isCreatingLead) return false
-    setIsCreatingLead(true)
-    setLeadSaveError('')
-    try {
+    if (leadCreationRef.current) return leadCreationRef.current
+    const promise = (async () => {
+      if (isCreatingLead) return false
+      setIsCreatingLead(true)
+      setLeadSaveError('')
+      try {
       if (typeof window !== 'undefined') {
         const existingLeadId = window.sessionStorage.getItem('disun_lead_id')
         const existingLeadToken = window.sessionStorage.getItem('disun_lead_token')
@@ -145,8 +148,15 @@ export default function Page() {
       }
       setLeadSaveError(error instanceof Error ? error.message : 'Unable to create your lead. Please try again.')
       return false
+      } finally {
+        setIsCreatingLead(false)
+      }
+    })()
+    leadCreationRef.current = promise
+    try {
+      return await promise
     } finally {
-      setIsCreatingLead(false)
+      leadCreationRef.current = null
     }
   }
 
