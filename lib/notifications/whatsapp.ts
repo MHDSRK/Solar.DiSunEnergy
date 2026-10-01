@@ -23,7 +23,7 @@ function config() {
   return {
     accessToken,
     phoneNumberId,
-    version: process.env.WHATSAPP_GRAPH_API_VERSION?.trim() || 'v22.0',
+    version: process.env.WHATSAPP_GRAPH_API_VERSION?.trim() || 'v26.0',
     templateName,
     templateLanguage,
     imageUrl,
@@ -97,7 +97,14 @@ async function sendTemplate(
 
   const details = await response.text()
   if (!response.ok) {
-    throw new Error(`WhatsApp template notification failed (${response.status}): ${details.slice(0, 1000)}`)
+    let apiCode: string | undefined
+    try {
+      const parsed = JSON.parse(details) as { error?: { code?: number | string } }
+      if (parsed.error?.code !== undefined) apiCode = String(parsed.error.code)
+    } catch {}
+    const error = new Error(`WhatsApp template notification failed (${response.status}): ${details.slice(0, 1000)}`) as Error & { whatsappCode?: string }
+    error.whatsappCode = apiCode
+    throw error
   }
 
   let data: { messages?: Array<{ id?: string }> } = {}
@@ -320,7 +327,14 @@ export async function sendWhatsAppFollowupReminder(followup: Record<string, unkn
 
   const details = await response.text()
   if (!response.ok) {
-    throw new Error(`WhatsApp follow-up reminder failed (${response.status}): ${details.slice(0, 1000)}`)
+    let apiCode: string | undefined
+    try {
+      const parsed = JSON.parse(details) as { error?: { code?: number | string } }
+      if (parsed.error?.code !== undefined) apiCode = String(parsed.error.code)
+    } catch {}
+    const error = new Error(`WhatsApp follow-up reminder failed (${response.status}): ${details.slice(0, 1000)}`) as Error & { whatsappCode?: string }
+    error.whatsappCode = apiCode
+    throw error
   }
 
   let data: { messages?: Array<{ id?: string }> } = {}
