@@ -8,8 +8,30 @@ function format(value: unknown) {
   return value === null || value === undefined || value === '' ? '-' : String(value)
 }
 
+let notificationSchemaPromise: Promise<void> | null = null
+
+async function ensureNotificationSchema() {
+  if (notificationSchemaPromise) return notificationSchemaPromise
+  notificationSchemaPromise = (async () => {
+    await ensureLeadTable()
+    await getSql()`CREATE TABLE IF NOT EXISTS notification_events (
+      event_key TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      status TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (event_key, channel)
+    )`
+  })().catch((error) => {
+    notificationSchemaPromise = null
+    throw error
+  })
+  return notificationSchemaPromise
+}
+
 async function claimNotification(eventKey: string, channel: string) {
-  await ensureLeadTable()
+  await ensureNotificationSchema()
   const rows = await getSql().query(
     "INSERT INTO notification_events (event_key, channel, status, attempts, updated_at) VALUES ($1, $2, 'PROCESSING', 1, NOW()) ON CONFLICT (event_key, channel) DO UPDATE SET status = 'PROCESSING', attempts = notification_events.attempts + 1, updated_at = NOW() WHERE notification_events.status <> 'SENT' RETURNING event_key",
     [eventKey, channel],
