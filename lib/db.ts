@@ -12,11 +12,41 @@ export function getSql() {
 }
 
 /**
- * Database schema is provisioned by `pnpm db:migrate`, not by request handlers.
- * Kept as a no-op for compatibility with existing callers during the migration.
+ * Ensure the core leads table exists.
+ * Production databases may not have had the migration script run yet, so
+ * request handlers must be able to recover from a missing leads table.
  */
 export async function ensureLeadTable() {
-  return Promise.resolve()
+  if (leadTablePromise) return leadTablePromise
+
+  leadTablePromise = (async () => {
+    const sql = getSql()
+    try {
+      await sql`SELECT 1 FROM leads LIMIT 1`
+      return
+    } catch {
+      await sql`CREATE TABLE IF NOT EXISTS leads (
+        lead_id TEXT PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        name TEXT,
+        phone TEXT,
+        district TEXT,
+        area TEXT,
+        connection_category TEXT,
+        recommended_kw NUMERIC,
+        kseb_consumer_number TEXT,
+        remaining_transformer_capacity NUMERIC,
+        lead_status TEXT NOT NULL DEFAULT 'NEW',
+        source TEXT NOT NULL DEFAULT 'web'
+      )`
+    }
+  })().catch((error) => {
+    leadTablePromise = null
+    throw error
+  })
+
+  return leadTablePromise
 }
 
 export async function ensureAdminTasksTable() {
