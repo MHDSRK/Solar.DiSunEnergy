@@ -45,6 +45,10 @@ export default function Page() {
   const resultRef = useRef<HTMLDivElement>(null)
   const [result, setResult] = useState<{ kw: number; roofMin: number; roofMax: number; cost: number; subsidy: number; loan: number; netCost: number; monthlyKwh: number; loanAssumption?: { estimatedEmi: number } } | null>(null)
   useEffect(() => {
+    void createLead()
+  }, [])
+
+  useEffect(() => {
     if (!result) return
     requestAnimationFrame(() => {
       const sheet = sheetRef.current
@@ -108,19 +112,38 @@ export default function Page() {
     setIsCreatingLead(true)
     setLeadSaveError('')
     try {
+      if (typeof window !== 'undefined') {
+        const existingLeadId = window.sessionStorage.getItem('disun_lead_id')
+        const existingLeadToken = window.sessionStorage.getItem('disun_lead_token')
+        if (existingLeadId && existingLeadToken) {
+          setLeadId(existingLeadId)
+          setLeadToken(existingLeadToken)
+          return true
+        }
+      }
+
       const response = await fetch('/api/leads', { method: 'POST', cache: 'no-store' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok || !data.leadId || !data.leadToken) {
-        throw new Error(data.message || 'Unable to start the calculator (HTTP ' + response.status + ').')
+        throw new Error(data.message || 'Unable to create lead (HTTP ' + response.status + ').')
       }
+
       setLeadId(data.leadId)
       setLeadToken(data.leadToken)
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('disun_lead_id', data.leadId)
+        window.sessionStorage.setItem('disun_lead_token', data.leadToken)
+      }
       return true
     } catch (error) {
       console.error('Lead creation failed', error)
       setLeadId(null)
       setLeadToken(null)
-      setLeadSaveError(error instanceof Error ? error.message : 'Unable to start the calculator. Please try again.')
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem('disun_lead_id')
+        window.sessionStorage.removeItem('disun_lead_token')
+      }
+      setLeadSaveError(error instanceof Error ? error.message : 'Unable to create your lead. Please try again.')
       return false
     } finally {
       setIsCreatingLead(false)
@@ -449,7 +472,7 @@ export default function Page() {
           <strong>Powerful future with SOLAR</strong>
         </p>
         <dl className="mx-auto mt-6 grid w-full max-w-[370px] grid-cols-3 divide-x divide-white/35"><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 78000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">PM SURYA GHAR<br />SUBSIDY</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Up to<br /><span className="text-xl sm:text-2xl">₹ 200000</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">BANK LOAN<br />AVAILABLE</dt></div><div className="px-2"><dd className="text-[13px] font-semibold leading-tight sm:text-lg">Panels with<br /><span className="text-xl sm:text-2xl">30 YEARS</span></dd><dt className="mt-2 text-[9px] leading-[1.35] tracking-[0.05em] text-white/80">WARRANTY<br />ASSURANCE</dt></div></dl>
-        <div className="mt-auto pt-6"><p className="mb-3 text-center text-[14px] font-medium leading-[1.15] tracking-[0.01em] sm:text-lg">How much Power required<br /><span className="text-[20px] font-extrabold sm:text-2xl">for your home?</span></p><button type="button" disabled={isCreatingLead} onClick={async () => { if (isCreatingLead) return; setIsCalculatorOpen(true); setIsFeasibilityPage(false); setIsEligibilityPage(false); setResult(null); setFeasibilityResult(null); setLeadSaveError(''); requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0 })); await createLead() }} className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03] disabled:cursor-wait disabled:opacity-70">{isCreatingLead ? 'STARTING...' : 'CALCULATE NOW'} <span className="ml-2 text-[#2e8dbe]">&gt;</span></button><p className="mt-5 text-xs text-white/90">By continuing, you agree to our <a className="underline" href="/privacy-policy">Privacy policy</a> and <a className="underline" href="/terms-of-service">Terms&amp;Conditions</a></p></div>
+        <div className="mt-auto pt-6"><p className="mb-3 text-center text-[14px] font-medium leading-[1.15] tracking-[0.01em] sm:text-lg">How much Power required<br /><span className="text-[20px] font-extrabold sm:text-2xl">for your home?</span></p><button type="button" disabled={isCreatingLead} onClick={() => { if (isCreatingLead) return; setIsCalculatorOpen(true); setIsFeasibilityPage(false); setIsEligibilityPage(false); setResult(null); setFeasibilityResult(null); setLeadSaveError(''); requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: 0 })) }} className="mx-auto flex min-h-12 max-w-[245px] items-center justify-center rounded-full bg-white px-7 text-sm font-extrabold tracking-[0.06em] text-[#06152d] shadow-[0_5px_18px_rgba(255,255,255,.18)] transition-transform hover:scale-[1.03] disabled:cursor-wait disabled:opacity-70">{isCreatingLead ? 'STARTING...' : 'CALCULATE NOW'} <span className="ml-2 text-[#2e8dbe]">&gt;</span></button><p className="mt-5 text-xs text-white/90">By continuing, you agree to our <a className="underline" href="/privacy-policy">Privacy policy</a> and <a className="underline" href="/terms-of-service">Terms&amp;Conditions</a></p></div>
       </section>
       {isCalculatorOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#03132f]/95 pt-[78px]" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
