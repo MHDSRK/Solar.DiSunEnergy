@@ -99,6 +99,16 @@ export async function ensureLeadTable() {
     await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS documents_completed_at TIMESTAMPTZ`
     await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS site_visit_booked_at TIMESTAMPTZ`
     await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ`
+
+    // The admin lead screen reads these related tables. Provision them here as
+    // well so a fresh production database never reports a successful lead save
+    // while the lead list itself fails because an auxiliary table is missing.
+    await sql`CREATE TABLE IF NOT EXISTS lead_audit_log (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, field TEXT NOT NULL, old_value TEXT, new_value TEXT, changed_by_name TEXT NOT NULL, changed_by_email TEXT NOT NULL, changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`
+    await sql`CREATE TABLE IF NOT EXISTS lead_followups (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, note TEXT, follow_up_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', reminder_sent_at TIMESTAMPTZ, created_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ)`
+    await sql`CREATE TABLE IF NOT EXISTS lead_payments (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, amount NUMERIC(12,2) NOT NULL, paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), method TEXT, note TEXT, recorded_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`
+    await sql`CREATE TABLE IF NOT EXISTS lead_project_stages (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, stage TEXT NOT NULL, note TEXT, stage_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), recorded_by_name TEXT NOT NULL)`
+    await sql`CREATE TABLE IF NOT EXISTS lead_documents (lead_id TEXT NOT NULL REFERENCES leads(lead_id) ON DELETE CASCADE, document_type TEXT NOT NULL, file_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, file_data BYTEA NOT NULL, uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (lead_id, document_type))`
+    await sql`CREATE TABLE IF NOT EXISTS site_visits (lead_id TEXT PRIMARY KEY REFERENCES leads(lead_id) ON DELETE CASCADE, name TEXT NOT NULL, phone TEXT NOT NULL, preferred_date DATE NOT NULL, preferred_time TIME NOT NULL, location TEXT NOT NULL, district TEXT, locality TEXT, area TEXT, latitude DOUBLE PRECISION, longitude DOUBLE PRECISION, status TEXT NOT NULL DEFAULT 'BOOKED', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`
   })().catch((error) => {
     leadTablePromise = null
     throw error
