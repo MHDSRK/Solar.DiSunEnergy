@@ -221,6 +221,21 @@ export async function updateWhatsAppStatus(status: { messageId: string; status: 
     [status.status, status.timestamp || '0', JSON.stringify(status.raw), status.messageId],
   )
   const updated = (rows as any[]).length > 0
+  if (!updated && status.recipient) {
+    try {
+      const conversation = await ensureWhatsAppConversation(status.recipient)
+      await storeWhatsAppOutboundMessage({
+        conversationId: conversation.conversationId,
+        messageId: status.messageId,
+        messageType: 'unknown',
+        deliveryStatus: status.status,
+        rawPayload: status.raw,
+      })
+      return true
+    } catch (error) {
+      console.error('Unable to create missing WhatsApp outbound status record', error)
+    }
+  }
   if (!updated) {
     console.warn('WhatsApp status received for unknown outbound message', {
       messageId: status.messageId,
