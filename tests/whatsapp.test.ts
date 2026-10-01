@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { test } from 'node:test'
-import { parseWhatsAppInbound, parseWhatsAppStatuses, verifyWhatsAppSignature } from '../lib/whatsapp.ts'
+import { normalizeWhatsAppPhone, parseWhatsAppInbound, parseWhatsAppStatuses, verifyWhatsAppSignature } from '../lib/whatsapp.ts'
 
 test('verifies a Meta-style webhook signature', () => {
   const previous = process.env.WHATSAPP_APP_SECRET
@@ -58,4 +58,12 @@ test('parses delivery status updates', () => {
     recipient: '919876543210',
     raw: { id: 'wamid.outbound', status: 'read', timestamp: '1770000002', recipient_id: '919876543210' },
   })
+})
+
+
+test('normalizes common Indian WhatsApp phone formats to one canonical value', () => {
+  assert.equal(normalizeWhatsAppPhone('9567398698'), '919567398698')
+  assert.equal(normalizeWhatsAppPhone('+919567398698'), '919567398698')
+  assert.equal(normalizeWhatsAppPhone('91 95673 98698'), '919567398698')
+  assert.equal(normalizeWhatsAppPhone('0919567398698'), '919567398698')
 })
