@@ -68,7 +68,7 @@ export default function Admin(){
      const id=String(l.lead_id), expanded=expandedId===id, place=[l.area,l.district].filter(Boolean).join(', ')
      const mapsUrl=place?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place+', Kerala')}`:null
      return <div key={id} className="border-b last:border-0">
-      <div className="grid min-h-14 grid-cols-[1fr_auto_auto] items-center gap-1 px-3 py-1.5 sm:px-4">
+      <div className="grid min-h-14 grid-cols-[1fr_auto_auto_auto] items-center gap-1 px-3 py-1.5 sm:px-4">
        <div className="flex min-w-0 items-center gap-1.5">
         <button type="button" title={selectedIds.includes(id)?'Remove from Selected':'Add to Selected'} onClick={()=>toggleSelect(id)} className="grid size-7 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-400"><span className={`text-base leading-none ${selectedIds.includes(id)?'text-amber-500':'text-slate-300'}`}>★</span></button>
         <button onClick={()=>setExpandedId(expanded?null:id)} className="min-w-0 text-left">
