@@ -10,26 +10,14 @@ function clientKey(request: Request, scope: string) {
   return `${scope}:${ip}`
 }
 
-async function ensureRateLimitTable() {
-  const sql = getSql()
-  await sql`CREATE TABLE IF NOT EXISTS api_rate_limits (rate_key TEXT NOT NULL, window_start TIMESTAMPTZ NOT NULL, request_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (rate_key, window_start))`
-}
-
 export async function checkRateLimit(
   request: Request,
   scope: string,
   limit: number,
   windowSeconds: number,
 ) {
-  await ensureLeadTable()
   const key = clientKey(request, scope)
   const sql = getSql()
-
-  try {
-    await sql`SELECT 1 FROM api_rate_limits LIMIT 1`
-  } catch {
-    await ensureRateLimitTable()
-  }
 
   await sql`
     DELETE FROM api_rate_limits
