@@ -33,7 +33,7 @@ async function ensureNotificationSchema() {
 async function claimNotification(eventKey: string, channel: string) {
   await ensureNotificationSchema()
   const rows = await getSql().query(
-    "INSERT INTO notification_events (event_key, channel, status, attempts, updated_at) VALUES ($1, $2, 'PROCESSING', 1, NOW()) ON CONFLICT (event_key, channel) DO UPDATE SET status = 'PROCESSING', attempts = notification_events.attempts + 1, updated_at = NOW() WHERE notification_events.status <> 'SENT' RETURNING event_key",
+    "INSERT INTO notification_events (event_key, channel, status, attempts, updated_at) VALUES ($1, $2, 'PROCESSING', 1, NOW()) ON CONFLICT (event_key, channel) DO UPDATE SET status = 'PROCESSING', attempts = notification_events.attempts + 1, updated_at = NOW() WHERE notification_events.status = 'FAILED' OR (notification_events.status = 'PROCESSING' AND notification_events.updated_at < NOW() - INTERVAL '5 minutes') RETURNING event_key",
     [eventKey, channel],
   )
   return (rows as unknown as Record<string, unknown>[]).length > 0
