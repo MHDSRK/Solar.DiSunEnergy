@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateSolarResult } from '../services/solar/calculator'
+import { calculateSolarResult } from '../services/solar/calculator.ts'
 
 test('advanced calculator returns ROI fields',()=>{
  const r=calculateSolarResult(5000,'Domestic','bill')
