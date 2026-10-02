@@ -38,6 +38,18 @@ async function failNotification(eventKey: string, channel: string, error: unknow
   )
 }
 
+export async function claimManualWhatsAppSend(idempotencyKey: string) {
+  return claimNotification(`ADMIN_WHATSAPP:${idempotencyKey}`, 'WHATSAPP_ADMIN')
+}
+
+export async function completeManualWhatsAppSend(idempotencyKey: string) {
+  return completeNotification(`ADMIN_WHATSAPP:${idempotencyKey}`, 'WHATSAPP_ADMIN')
+}
+
+export async function failManualWhatsAppSend(idempotencyKey: string, error: unknown) {
+  return failNotification(`ADMIN_WHATSAPP:${idempotencyKey}`, 'WHATSAPP_ADMIN', error)
+}
+
 function eventMessage(event: string, lead: LeadRecord) {
   const common = [
     `Lead ID: ${format(lead.lead_id)}`,
@@ -108,7 +120,12 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
       if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
       else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
-      await failNotification(eventKey, 'WHATSAPP', error)
+      const whatsappCode = error && typeof error === 'object' && 'whatsappCode' in error
+        ? String((error as { whatsappCode?: unknown }).whatsappCode || '')
+        : ''
+      // A transport/database error is ambiguous: Meta may already have accepted the
+      // message, so leave the event PROCESSING instead of retrying and risking a duplicate.
+      if (whatsappCode) await failNotification(eventKey, 'WHATSAPP', error)
       console.error('WhatsApp lead notification failed', error)
     }
   }
