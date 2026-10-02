@@ -44,7 +44,7 @@ export default function Page() {
   const sheetRef = useRef<HTMLElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
   const [result, setResult] = useState<{ kw: number; roofMin: number; roofMax: number; cost: number; subsidy: number; loan: number; netCost: number; monthlyKwh: number; loanAssumption?: { estimatedEmi: number } } | null>(null)
-  const leadCreationRef = useRef<Promise<boolean> | null>(null)
+  const leadCreationRef = useRef<Promise<{ success: boolean; leadId?: string; leadToken?: string }> | null>(null)
   useEffect(() => {
     if (!result) return
     requestAnimationFrame(() => {
@@ -201,9 +201,7 @@ export default function Page() {
         return
       }
 
-      // The website visit may already have created the lead. If it did not,
-      // CALCULATE is the fallback trigger that creates the lead before saving
-      // the calculator result.
+      // CALCULATE is the lead-creation trigger when no active lead exists.
       let activeLeadId = leadId
       let activeLeadToken = leadToken
       if (!activeLeadId || !activeLeadToken) {
