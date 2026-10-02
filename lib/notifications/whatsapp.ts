@@ -210,15 +210,10 @@ export async function sendWhatsAppLeadNotification(lead: Record<string, unknown>
       components: [{
         type: 'body',
         parameters: [
-          { type: 'text', text: format(lead.lead_id) },
           { type: 'text', text: format(lead.name) },
           { type: 'text', text: format(lead.phone) },
           { type: 'text', text: format(lead.district) },
           { type: 'text', text: format(lead.area) },
-          { type: 'text', text: format(lead.bill) },
-          { type: 'text', text: format(lead.monthly_kwh) },
-          { type: 'text', text: format(lead.connection_category) },
-          { type: 'text', text: format(lead.recommended_kw) },
         ],
       }],
     },
