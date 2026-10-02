@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
-import { ensureWhatsAppSchema } from '@/lib/whatsapp'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -9,7 +8,6 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   try {
     await requireAdmin()
-    await ensureWhatsAppSchema()
     const id = Number(new URL(request.url).searchParams.get('conversationId') || 0)
     if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ success: false, message: 'Conversation ID is required.' }, { status: 400 })
 
