@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSql, ensureLeadTable } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
-import { ensureWhatsAppSchema, sendWhatsAppTextMessage } from '@/lib/whatsapp'
 import { sendWhatsAppTextMessage as sendText } from '@/lib/notifications/whatsapp'
 
 export const runtime = 'nodejs'
@@ -10,7 +9,6 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: Request) {
   try {
     await requireAdmin()
-    await ensureWhatsAppSchema()
     await ensureLeadTable()
     const body = await request.json()
     const conversationId = Number(body?.conversationId || 0)
