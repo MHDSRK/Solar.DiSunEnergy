@@ -57,6 +57,16 @@ async function ensureWhatsAppSchema() {
   if (whatsappSchemaPromise) return whatsappSchemaPromise
   whatsappSchemaPromise = (async () => {
     const sql = await getDb()
+    await sql`CREATE TABLE IF NOT EXISTS whatsapp_webhook_events (
+      id BIGSERIAL PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      message_id TEXT,
+      phone_number_id TEXT,
+      payload JSONB NOT NULL,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
+    await sql`CREATE INDEX IF NOT EXISTS whatsapp_webhook_events_message_idx ON whatsapp_webhook_events (message_id, received_at DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS whatsapp_webhook_events_type_idx ON whatsapp_webhook_events (event_type, received_at DESC)`
     await sql`CREATE TABLE IF NOT EXISTS whatsapp_contacts (
       id BIGSERIAL PRIMARY KEY,
       phone TEXT NOT NULL UNIQUE,
@@ -238,6 +248,20 @@ export async function storeWhatsAppOutboundMessage(input: {
     [input.conversationId],
   )
   return Number((rows as any[])[0]?.id)
+}
+
+export async function storeWhatsAppWebhookEvent(input: {
+  eventType: string
+  messageId?: string | null
+  phoneNumberId?: string | null
+  payload: unknown
+}) {
+  await ensureWhatsAppSchema()
+  const sql = await getDb()
+  await sql.query(
+    'INSERT INTO whatsapp_webhook_events (event_type, message_id, phone_number_id, payload) VALUES ($1, $2, $3, $4::jsonb)',
+    [input.eventType, input.messageId || null, input.phoneNumberId || null, JSON.stringify(input.payload)],
+  )
 }
 
 export function parseWhatsAppInbound(body: any): WhatsAppInboundMessage[] {
