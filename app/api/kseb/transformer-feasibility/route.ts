@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server'
 import { decodeKsebConsumerNumber } from '@/services/kseb/consumerDecoder'
 import { calculateFeasibility, getBalanceStatus } from '@/services/kseb/feasibilityEngine'
 import { fetchKsebRecap, resolveKsebSection } from '@/services/kseb/recapClient'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
 
 export async function POST(request: Request) {
   try {
+    const rate = await checkRateLimit(request, 'kseb-feasibility', 10, 60)
+    if (rate.limited) return rateLimitResponse(rate.retryAfter)
+
     const body = await request.json() as { consumerNumber?: string; districtId?: string; district?: string; districtName?: string; sectionId?: string; sectionOffice?: string; requestedKw?: number; transformerId?: string; transformerName?: string }
     const requestedKw = Number(body.requestedKw)
     if (!Number.isFinite(requestedKw) || requestedKw <= 0) return NextResponse.json({ success: false, state: 'INVALID_REQUEST', message: 'Enter a valid requested solar capacity.' }, { status: 400 })
@@ -12,9 +16,6 @@ export async function POST(request: Request) {
     const decoded = consumerNumber ? decodeKsebConsumerNumber(consumerNumber) : null
     if (consumerNumber && decoded?.reason === 'INVALID_CONSUMER_NUMBER') return NextResponse.json({ success: false, state: 'INVALID_CONSUMER_NUMBER', message: 'Please enter a valid 13-digit KSEB Consumer Number.' }, { status: 400 })
 
-    // Consumer decoding is optional. An unresolved consumer mapping must never
-    // prevent a selected section office or explicit sectionId from initiating
-    // the authoritative KSEB DTR request.
     const section = await resolveKsebSection({
       sectionId: body.sectionId,
       sectionOffice: body.sectionOffice || (decoded?.valid ? decoded.sectionName : undefined),
