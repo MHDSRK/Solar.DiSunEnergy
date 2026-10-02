@@ -1,4 +1,4 @@
-import { ensureLeadTable, getSql } from '@/lib/db'
+import { getSql } from '@/lib/db'
 
 function clientKey(request: Request, scope: string) {
   // Vercel sanitizes X-Forwarded-For to prevent client IP spoofing. Prefer
