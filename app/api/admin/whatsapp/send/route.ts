@@ -5,6 +5,8 @@ import {
   claimManualWhatsAppSend,
   completeManualWhatsAppSend,
   failManualWhatsAppSend,
+} from '@/lib/notifications/leadNotifications'
+import {
   sendWhatsAppLeadTemplate,
   sendWhatsAppPdf,
   sendWhatsAppTextMessage,
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     try {
-        if (mode === 'text') {
+      if (mode === 'text') {
         const result = await sendWhatsAppTextMessage(lead, bodyText)
         if (!result.sent) {
           await failManualWhatsAppSend(idempotencyKey, 'WhatsApp integration is not configured.')
