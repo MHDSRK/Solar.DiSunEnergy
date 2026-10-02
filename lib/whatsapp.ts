@@ -273,10 +273,19 @@ export function parseWhatsAppStatuses(body: any) {
   return statuses
 }
 
+const WHATSAPP_STATUS_RANK: Record<string, number> = {
+  accepted: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 4,
+}
+
 export async function updateWhatsAppStatus(status: { messageId: string; status: string; timestamp: string | null; recipient: string | null; raw: unknown }) {
   await ensureWhatsAppSchema()
   const sql = await getDb()
   const normalizedStatus = String(status.status || 'unknown').toLowerCase()
+  const incomingRank = WHATSAPP_STATUS_RANK[normalizedStatus] ?? 0
   const timestamp = status.timestamp ? Number(status.timestamp) : NaN
   const hasTimestamp = Number.isFinite(timestamp) && timestamp > 0
   const statusAt = hasTimestamp ? new Date(timestamp * 1000) : null
@@ -297,27 +306,47 @@ export async function updateWhatsAppStatus(status: { messageId: string; status: 
          OR $2::timestamptz IS NULL
          OR $2::timestamptz >= status_at
        )
+       AND (
+         delivery_status IS NULL
+         OR delivery_status = 'accepted'
+         OR $5::integer >= COALESCE(
+           CASE delivery_status
+             WHEN 'accepted' THEN 0
+             WHEN 'sent' THEN 1
+             WHEN 'delivered' THEN 2
+             WHEN 'read' THEN 3
+             WHEN 'failed' THEN 4
+             ELSE 0
+           END, 0
+         )
+       )
      RETURNING id, delivery_status, status_at`,
-    [normalizedStatus, statusAt, JSON.stringify(status.raw), status.messageId],
+    [normalizedStatus, statusAt, JSON.stringify(status.raw), status.messageId, incomingRank],
   )
   const updated = (rows as any[]).length > 0
   if (!updated && status.recipient) {
-    try {
-      const conversation = await ensureWhatsAppConversation(status.recipient)
-      await storeWhatsAppOutboundMessage({
-        conversationId: conversation.conversationId,
-        messageId: status.messageId,
-        messageType: 'unknown',
-        deliveryStatus: normalizedStatus,
-        rawPayload: status.raw,
-      })
-      return true
-    } catch (error) {
-      console.error('Unable to create missing WhatsApp outbound status record', error)
+    const existing = await sql.query(
+      'SELECT id, delivery_status FROM whatsapp_messages WHERE whatsapp_message_id = $1 LIMIT 1',
+      [status.messageId],
+    ) as any[]
+    if (existing.length === 0) {
+      try {
+        const conversation = await ensureWhatsAppConversation(status.recipient)
+        await storeWhatsAppOutboundMessage({
+          conversationId: conversation.conversationId,
+          messageId: status.messageId,
+          messageType: 'unknown',
+          deliveryStatus: normalizedStatus,
+          rawPayload: status.raw,
+        })
+        return true
+      } catch (error) {
+        console.error('Unable to create missing WhatsApp outbound status record', error)
+      }
     }
   }
   if (!updated) {
-    console.warn('WhatsApp status ignored because it is older than the stored status or the message is unknown', {
+    console.warn('WhatsApp status ignored because it is older or lower priority than the stored status', {
       messageId: status.messageId,
       status: normalizedStatus,
       recipient: status.recipient,
