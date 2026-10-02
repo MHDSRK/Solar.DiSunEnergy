@@ -64,12 +64,22 @@ async function getSections() {
 }
 
 export async function resolveKsebSection(input: { sectionId?: string; sectionOffice?: string; districtId?: string; districtName?: string }) {
-  if (input.sectionId) return { sectionId: input.sectionId, name: input.sectionOffice ?? '', districtId: input.districtId ?? '', districtName: input.districtName ?? '' }
   const sections = await getSections()
+
+  if (input.sectionId) {
+    const authoritative = sections.find((section) => String(section.sectionId) === String(input.sectionId))
+    if (!authoritative) return null
+    return authoritative
+  }
+
   const query = input.sectionOffice?.trim().toLocaleLowerCase()
   if (!query) return null
   const simplifiedQuery = query.replace(/\s+electrical\s+section\s*$/i, '').trim()
-  return sections.find((section) => { const name = section.name.toLocaleLowerCase(); const simplifiedName = name.replace(/\s*\[[^\]]+\]\s*$/, '').trim(); return name === query || name.includes(query) || simplifiedName === query || simplifiedName === simplifiedQuery || simplifiedName.includes(simplifiedQuery) }) ?? null
+  return sections.find((section) => {
+    const name = section.name.toLocaleLowerCase()
+    const simplifiedName = name.replace(/\s*\[[^\]]+\]\s*$/, '').trim()
+    return name === query || name.includes(query) || simplifiedName === query || simplifiedName === simplifiedQuery || simplifiedName.includes(simplifiedQuery)
+  }) ?? null
 }
 
 export async function fetchKsebRecap({ sectionId }: { sectionId: string }) {
