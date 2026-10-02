@@ -1,6 +1,6 @@
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { syncLeadToGoogleSheet, appendSiteVisitToGoogleSheet } from '@/lib/notifications/googleSheets'
-import { sendWhatsAppLeadTemplate } from '@/lib/notifications/whatsapp'
+import { sendWhatsAppLeadNotification } from '@/lib/notifications/whatsapp'
 
 type LeadRecord = Record<string, unknown>
 
@@ -11,29 +11,13 @@ function format(value: unknown) {
 let notificationSchemaPromise: Promise<void> | null = null
 
 async function ensureNotificationSchema() {
-  if (notificationSchemaPromise) return notificationSchemaPromise
-  notificationSchemaPromise = (async () => {
-    await ensureLeadTable()
-    await getSql()`CREATE TABLE IF NOT EXISTS notification_events (
-      event_key TEXT NOT NULL,
-      channel TEXT NOT NULL,
-      status TEXT NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (event_key, channel)
-    )`
-  })().catch((error) => {
-    notificationSchemaPromise = null
-    throw error
-  })
-  return notificationSchemaPromise
+  return
 }
 
 async function claimNotification(eventKey: string, channel: string) {
   await ensureNotificationSchema()
   const rows = await getSql().query(
-    "INSERT INTO notification_events (event_key, channel, status, attempts, updated_at) VALUES ($1, $2, 'PROCESSING', 1, NOW()) ON CONFLICT (event_key, channel) DO UPDATE SET status = 'PROCESSING', attempts = notification_events.attempts + 1, updated_at = NOW() WHERE notification_events.status <> 'SENT' RETURNING event_key",
+    "INSERT INTO notification_events (event_key, channel, status, attempts, updated_at) VALUES ($1, $2, 'PROCESSING', 1, NOW()) ON CONFLICT (event_key, channel) DO UPDATE SET status = 'PROCESSING', attempts = notification_events.attempts + 1, updated_at = NOW() WHERE notification_events.status = 'FAILED' RETURNING event_key",
     [eventKey, channel],
   )
   return (rows as unknown as Record<string, unknown>[]).length > 0
@@ -52,6 +36,18 @@ async function failNotification(eventKey: string, channel: string, error: unknow
     "UPDATE notification_events SET status = 'FAILED', last_error = $1, updated_at = NOW() WHERE event_key = $2 AND channel = $3",
     [message.slice(0, 1000), eventKey, channel],
   )
+}
+
+export async function claimManualWhatsAppSend(idempotencyKey: string) {
+  return claimNotification(`ADMIN_WHATSAPP:${idempotencyKey}`, 'WHATSAPP_ADMIN')
+}
+
+export async function completeManualWhatsAppSend(idempotencyKey: string) {
+  return completeNotification(`ADMIN_WHATSAPP:${idempotencyKey}`, 'WHATSAPP_ADMIN')
+}
+
+export async function failManualWhatsAppSend(idempotencyKey: string, error: unknown) {
+  return failNotification(`ADMIN_WHATSAPP:${idempotencyKey}`, 'WHATSAPP_ADMIN', error)
 }
 
 function eventMessage(event: string, lead: LeadRecord) {
@@ -105,7 +101,7 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     whatsapp: { configured: false, sent: false },
   }
 
-  if (await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
+  if (event !== 'created' && await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
     try {
       results.googleSheet = await syncLeadToGoogleSheet(lead)
       if (results.googleSheet.saved) await completeNotification(eventKey, 'GOOGLE_SHEETS')
@@ -116,15 +112,20 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     }
   }
 
-  // WhatsApp is intentionally sent only once, after the first CALCULATE submission.
-  // CREATED happens before the form data exists; FEASIBILITY and later events must not send another WhatsApp.
+  // Automatic lead notifications go to the configured internal recipient, not the lead's phone.
+  // CREATED happens before the form data exists; CALCULATOR is the first event with complete lead details.
   if (event === 'calculator' && await claimNotification(eventKey, 'WHATSAPP')) {
     try {
-      results.whatsapp = await sendWhatsAppLeadTemplate(lead)
+      results.whatsapp = await sendWhatsAppLeadNotification(lead)
       if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
       else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
-      await failNotification(eventKey, 'WHATSAPP', error)
+      const whatsappCode = error && typeof error === 'object' && 'whatsappCode' in error
+        ? String((error as { whatsappCode?: unknown }).whatsappCode || '')
+        : ''
+      // A transport/database error is ambiguous: Meta may already have accepted the
+      // message, so leave the event PROCESSING instead of retrying and risking a duplicate.
+      if (whatsappCode) await failNotification(eventKey, 'WHATSAPP', error)
       console.error('WhatsApp lead notification failed', error)
     }
   }

@@ -26,12 +26,12 @@ export async function POST(request: Request) {
     const contact = rows[0]
     if (!contact) return NextResponse.json({ success: false, message: 'Conversation not found.' }, { status: 404 })
 
-    const lead = contact.lead_id
-      ? (await getSql().query('SELECT lead_id, phone FROM leads WHERE lead_id = $1 LIMIT 1', [contact.lead_id]) as Record<string, any>[])[0]
-      : { lead_id: null, phone: contact.phone }
-    if (!lead?.phone) return NextResponse.json({ success: false, message: 'This WhatsApp contact is not linked to a lead with a phone number.' }, { status: 400 })
+    const recipient = String(contact.phone || '').trim()
+    if (!recipient) return NextResponse.json({ success: false, message: 'This WhatsApp conversation has no recipient phone number.' }, { status: 400 })
 
-    const result = await sendText(lead, message)
+    // The WhatsApp contact number is authoritative. A lead's phone can be
+    // changed independently after the conversation was created.
+    const result = await sendText({ lead_id: contact.lead_id || null, phone: recipient }, message)
     if (!result.sent) return NextResponse.json({ success: false, message: 'WhatsApp integration is not configured.' }, { status: 503 })
     return NextResponse.json({ success: true, messageId: result.messageId, recipient: result.recipient })
   } catch (error) {

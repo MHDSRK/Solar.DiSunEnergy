@@ -14,13 +14,14 @@ const taskDateTime = (v:any) => { const s=taskDateValue(v); return s?new Date(`$
 
 export default function Admin(){
  const[session,setSession]=useState<any>(null),[password,setPassword]=useState(''),[err,setErr]=useState(''),[notice,setNotice]=useState(''); const loginInFlight=useRef(false)
- const[leads,setLeads]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[stages,setStages]=useState<Row[]>([]),[tasks,setTasks]=useState<Row[]>([])
+ const[leads,setLeads]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[stages,setStages]=useState<Row[]>([]),[tasks,setTasks]=useState<Row[]>([]),[leadPage,setLeadPage]=useState(1),[leadTotal,setLeadTotal]=useState(0),[leadHasMore,setLeadHasMore]=useState(false)
  const[tab,setTab]=useState<'TASKS'|'LEADS'|'WHATSAPP'>('TASKS'),[leadSection,setLeadSection]=useState<'SELECTED'|'ALL'>('SELECTED'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
  const[expandedId,setExpandedId]=useState<string|null>(null),[newLeadOpen,setNewLeadOpen]=useState(false),[editLead,setEditLead]=useState<Row|null>(null),[whatsappLead,setWhatsappLead]=useState<Row|null>(null),[whatsappMode,setWhatsappMode]=useState<'text'|'document'|'template'>('text'),[whatsappMessage,setWhatsappMessage]=useState(''),[whatsappCaption,setWhatsappCaption]=useState(''),[whatsappFile,setWhatsappFile]=useState<File|null>(null),[whatsappError,setWhatsappError]=useState(''),[paymentLead,setPaymentLead]=useState<string|null>(null),[paymentAmount,setPaymentAmount]=useState(""),[paymentMethod,setPaymentMethod]=useState(""),[paymentNote,setPaymentNote]=useState(""),[stageLead,setStageLead]=useState<string|null>(null),[customStageOpen,setCustomStageOpen]=useState(false),[customStage,setCustomStage]=useState('')
  const[form,setForm]=useState({name:'',phone:'',district:'',area:'',connection_category:'',recommended_kw:'',kseb_consumer_number:'',remaining_transformer_capacity:''})
- const[taskModal,setTaskModal]=useState<Row|null>(null),[addTaskMode,setAddTaskMode]=useState<'CHOOSER'|'NEW'|'EXISTING'|null>(null)
+ const[taskModal,setTaskModal]=useState<Row|null>(null),[addTaskMode,setAddTaskMode]=useState<'CHOOSER'|'NEW'|'EXISTING'|null>(null),[whatsappSending,setWhatsappSending]=useState(false); const whatsappSendInFlight=useRef(false)
 
- const load=async()=>{const [lr,tr]=await Promise.all([fetch('/api/admin/leads',{cache:'no-store'}),fetch('/api/admin/tasks',{cache:'no-store'})]);const d=await lr.json();const td=await tr.json();if(lr.ok){setLeads(d.leads||[]);setAudit(d.audit||[]);setPayments(d.payments||[]);setStages(d.stages||[])}if(tr.ok)setTasks(td.tasks||[])}
+ const load=async()=>{const [lr,tr]=await Promise.all([fetch('/api/admin/leads?page=1&pageSize=50',{cache:'no-store'}),fetch('/api/admin/tasks',{cache:'no-store'})]);const d=await lr.json();const td=await tr.json();if(lr.ok){setLeads(d.leads||[]);setAudit(d.audit||[]);setPayments(d.payments||[]);setStages(d.stages||[]);setLeadPage(1);setLeadTotal(Number(d.total||0));setLeadHasMore(Boolean(d.hasMore))}if(tr.ok)setTasks(td.tasks||[])}
+ const loadMoreLeads=async()=>{if(!leadHasMore)return;const nextPage=leadPage+1;const r=await fetch('/api/admin/leads?page='+nextPage+'&pageSize=50',{cache:'no-store'});const d=await r.json();if(!r.ok){setNotice(d.message||'Unable to load more leads.');return}setLeads(current=>[...current,...(d.leads||[])]);setAudit(current=>[...current,...(d.audit||[])]);setPayments(current=>[...current,...(d.payments||[])]);setStages(current=>[...current,...(d.stages||[])]);setLeadPage(nextPage);setLeadTotal(Number(d.total||0));setLeadHasMore(Boolean(d.hasMore))}
  useEffect(()=>{let active=true;fetch('/api/admin/session',{cache:'no-store'}).then(async r=>{const d=await r.json();if(!active||loginInFlight.current)return;setSession(d);if(d.authenticated)await load()}).catch(()=>{if(active&&!loginInFlight.current)setSession({authenticated:false})});return()=>{active=false}},[])
  const login=async(e:any)=>{e.preventDefault();if(loginInFlight.current)return;setErr('');loginInFlight.current=true;try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},credentials:'same-origin',cache:'no-store',body:JSON.stringify({password})});const d=await r.json().catch(()=>({}));if(!r.ok){setErr(d.message||'Login failed');return}setPassword('');setSession({authenticated:true,name:d.name,email:d.email});await load()}catch{setErr('Unable to connect to the server. Please try again.')}finally{loginInFlight.current=false}}
  const stageNames=useMemo(()=>[...new Set([...STAGES,...stages.map(x=>String(x.stage||'')).filter(Boolean)])],[stages])
@@ -41,28 +42,29 @@ export default function Admin(){
  const saveTask=async(e:any)=>{e.preventDefault();if(!taskModal)return;const editing=Boolean(taskModal.id);const name=String(taskModal.name??'').trim();const taskDate=taskDateValue(taskModal.task_date);if(!name||!taskDate){setNotice('Task name and date are required.');return}const r=await fetch('/api/admin/tasks',{method:editing?'PATCH':'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:taskModal.id,name,note:taskModal.note,taskDate,number:taskModal.number,place:taskModal.place,stage:taskModal.stage,plant:taskModal.plant,payment:taskModal.payment,source:taskModal.source})});const d=await r.json();setNotice(d.message||(r.ok?(editing?'Task updated.':'Task added.'):'Task failed.'));if(r.ok){setTaskModal(null);await load()}}
  const completeTask=async(id:number,done:boolean)=>{const r=await fetch('/api/admin/tasks',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({id,action:done?'PENDING':'DONE'})});const d=await r.json();setNotice(d.message||(r.ok?(done?'Task reopened.':'Task completed.'):'Could not update task.'));if(r.ok)await load()}
  const deleteTask=async(id:number)=>{if(!confirm('Delete this task? This cannot be undone.'))return;const r=await fetch('/api/admin/tasks',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id})});const d=await r.json();setNotice(d.message||(r.ok?'Task deleted.':'Delete failed.'));if(r.ok)await load()}
- const pollWhatsAppStatus=async(messageId:string)=>{
-   for(let attempt=0;attempt<15;attempt++){
-    await new Promise(resolve=>setTimeout(resolve,2000))
-    try{
-     const r=await fetch('/api/admin/whatsapp/status?messageId='+encodeURIComponent(messageId),{cache:'no-store',credentials:'same-origin'})
-     const d=await r.json().catch(()=>({}))
-     if(!r.ok) continue
-     const status=String(d.status||'accepted').toLowerCase()
-     if(status==='sent'){setNotice('WhatsApp message sent by Meta — waiting for delivery.');continue}
-     if(status==='delivered'){setNotice('WhatsApp message delivered.');return}
-     if(status==='read'){setNotice('WhatsApp message read.');return}
-     if(status==='failed'){
-      const error=d.error
-      const reason=error?.error?.message||error?.message||error?.details||'Meta reported message delivery failure.'
-      setNotice('WhatsApp message failed: '+reason)
-      return
-     }
-    }catch{}
+ const sendWhatsApp=async(mode: 'text'|'document'|'template')=>{
+  if(!whatsappLead||whatsappSendInFlight.current)return
+  whatsappSendInFlight.current=true
+  setWhatsappSending(true);setNotice('');setWhatsappError('')
+  const idempotencyKey=crypto.randomUUID()
+  try{
+   let r:Response
+   const idempotencyHeader={'x-whatsapp-idempotency-key':idempotencyKey}
+   if(mode==='document'){
+    if(!whatsappFile){setWhatsappError('Please select a PDF file.');return}
+    const formData=new FormData();formData.append('leadId',String(whatsappLead.lead_id));formData.append('mode','document');formData.append('caption',whatsappCaption);formData.append('file',whatsappFile)
+    r=await fetch('/api/admin/whatsapp/send',{method:'POST',headers:idempotencyHeader,credentials:'same-origin',body:formData})
+   }else{
+    r=await fetch('/api/admin/whatsapp/send',{method:'POST',headers:{'content-type':'application/json',...idempotencyHeader},credentials:'same-origin',body:JSON.stringify({leadId:whatsappLead.lead_id,mode,message:whatsappMessage})})
    }
-   setNotice('WhatsApp message accepted by Meta — no delivery status received yet.')
+   const d=await r.json().catch(()=>({}))
+   if(d.requiresTemplate){setWhatsappMode('template');setWhatsappError(d.message||'An approved template is required for this conversation.');return}
+   if(!r.ok){setWhatsappError(d.message||'WhatsApp send failed.');return}
+   setNotice('WhatsApp message sent successfully.')
+   setWhatsappLead(null);setWhatsappMessage('');setWhatsappCaption('');setWhatsappFile(null)
+  }catch(e){setWhatsappError(e instanceof Error?e.message:'Unable to send WhatsApp message.')}
+  finally{whatsappSendInFlight.current=false;setWhatsappSending(false)}
  }
- const sendWhatsApp=async(mode: 'text'|'document'|'template')=>{if(!whatsappLead)return;setNotice('');setWhatsappError('');try{let r:Response;if(mode==='document'){if(!whatsappFile){setWhatsappError('Please select a PDF file.');return}const formData=new FormData();formData.append('leadId',String(whatsappLead.lead_id));formData.append('mode','document');formData.append('caption',whatsappCaption);formData.append('file',whatsappFile);r=await fetch('/api/admin/whatsapp/send',{method:'POST',credentials:'same-origin',body:formData})}else{r=await fetch('/api/admin/whatsapp/send',{method:'POST',headers:{'content-type':'application/json'},credentials:'same-origin',body:JSON.stringify({leadId:whatsappLead.lead_id,mode,message:whatsappMessage})})}const d=await r.json().catch(()=>({}));if(d.requiresTemplate){setWhatsappMode('template');setWhatsappError(d.message||'An approved template is required for this conversation.');return}if(!r.ok){setWhatsappError(d.message||'WhatsApp send failed.');return}const messageId=String(d.messageId||'');setNotice(mode==='template'?'WhatsApp template accepted by Meta — waiting for delivery.':'WhatsApp message accepted by Meta — waiting for delivery.');setWhatsappLead(null);setWhatsappMessage('');setWhatsappCaption('');setWhatsappFile(null);if(messageId)void pollWhatsAppStatus(messageId)}catch(e){setWhatsappError(e instanceof Error?e.message:'Unable to send WhatsApp message.')}}
  const saveEdit=async(e:any)=>{e.preventDefault();if(!editLead)return;const id=editLead.lead_id;const payload={phone:String(editLead.phone??'').replace(/\D/g,''),area:editLead.area,recommended_kw:editLead.recommended_kw,kseb_consumer_number:editLead.kseb_consumer_number,remaining_transformer_capacity:editLead.remaining_transformer_capacity};const r=await fetch('/api/admin/leads/'+encodeURIComponent(id),{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok){setNotice(d.message||'Could not update lead.');return}const amount=Number(String(editLead.payment_amount??'').replace(/,/g,''));let pr:Response|null=null;if(editLead.payment_id&&Number.isFinite(amount)&&amount>=0){pr=await fetch('/api/admin/payments',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({id:Number(editLead.payment_id),amount})})}else if(!editLead.payment_id&&Number.isFinite(amount)&&amount>0){pr=await fetch('/api/admin/payments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leadId:id,amount})})}if(pr&&!pr.ok){const pd=await pr.json().catch(()=>({}));setNotice(pd.message||'Lead saved, but payment could not be updated.');setEditLead(null);await load();return}setNotice('Lead updated.');setEditLead(null);await load()}
 
  if(session===null)return <main className="min-h-dvh grid place-items-center bg-slate-950 text-white">Loading…</main>
@@ -117,9 +119,10 @@ export default function Admin(){
     })
    })()}
   </div>
+  {leadSection==='ALL'&&<div className="mt-3 flex items-center justify-between rounded-xl bg-white px-3 py-2 text-[10px] text-slate-400"><span>Showing {leads.length} of {leadTotal} leads</span>{leadHasMore&&<button onClick={()=>void loadMoreLeads()} className="font-bold text-sky-700">LOAD MORE</button>}</div>}
  </>} {taskModal&&addTaskMode===null&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>setTaskModal(null)} save={saveTask}/>}  {addTaskMode==='CHOOSER'&&<AddTaskChooser close={()=>setAddTaskMode(null)} chooseNew={()=>{setTaskModal({name:'',place:'',number:'',plant:'',stage:'',payment:'',source:'Manual',note:'',task_date:new Date().toISOString().slice(0,10)});setAddTaskMode('NEW')}} chooseExisting={()=>setAddTaskMode('EXISTING')}/>} {addTaskMode==='NEW'&&taskModal&&<TaskEntryModal task={taskModal} setTask={setTaskModal} close={()=>{setTaskModal(null);setAddTaskMode(null)}} save={saveNewTask} fixedSource/>} {addTaskMode==='EXISTING'&&<ExistingTaskModal leads={leads} tasks={tasks} close={()=>setAddTaskMode(null)} openTask={(task)=>{setTaskModal(task);setAddTaskMode('NEW')}}/>} {newLeadOpen&&<NewLeadModal form={form} setForm={setForm} close={()=>setNewLeadOpen(false)} create={create}/>}
  {editLead&&<EditLeadModal lead={editLead} setLead={setEditLead} close={()=>setEditLead(null)} save={saveEdit}/>}
- {whatsappLead&&<WhatsAppSendModal lead={whatsappLead} mode={whatsappMode} setMode={setWhatsappMode} message={whatsappMessage} setMessage={setWhatsappMessage} caption={whatsappCaption} setCaption={setWhatsappCaption} file={whatsappFile} setFile={setWhatsappFile} error={whatsappError} close={()=>{setWhatsappLead(null);setWhatsappError('');setWhatsappMessage('');setWhatsappCaption('');setWhatsappFile(null)}} send={sendWhatsApp}/>}
+ {whatsappLead&&<WhatsAppSendModal lead={whatsappLead} mode={whatsappMode} setMode={setWhatsappMode} message={whatsappMessage} setMessage={setWhatsappMessage} caption={whatsappCaption} setCaption={setWhatsappCaption} file={whatsappFile} setFile={setWhatsappFile} error={whatsappError} sending={whatsappSending} close={()=>{if(whatsappSending)return;setWhatsappLead(null);setWhatsappError('');setWhatsappMessage('');setWhatsappCaption('');setWhatsappFile(null)}} send={sendWhatsApp}/>}
  {historyOpen&&<HistoryModal rows={audit} close={()=>setHistoryOpen(false)}/>}
  </section>
  </div>
@@ -134,32 +137,57 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
  const [loading,setLoading]=useState(true)
  const [sending,setSending]=useState(false)
  const [error,setError]=useState('')
+ const [conversationPage,setConversationPage]=useState(1)
+ const [conversationHasMore,setConversationHasMore]=useState(false)
+ const [messageHasMore,setMessageHasMore]=useState(false)
+ const [messageBefore,setMessageBefore]=useState<string|null>(null)
+ const [loadingOlder,setLoadingOlder]=useState(false)
 
- const loadConversations=async()=>{
+ const loadConversations=async(append=false)=>{
   try{
-   const r=await fetch('/api/admin/whatsapp/conversations',{cache:'no-store',credentials:'same-origin'})
+   const page=append?conversationPage+1:1
+   const r=await fetch('/api/admin/whatsapp/conversations?page='+page+'&pageSize=30',{cache:'no-store',credentials:'same-origin'})
    const d=await r.json().catch(()=>({}))
    if(!r.ok) throw new Error(d.message||'Unable to load WhatsApp conversations.')
-   setConversations(d.conversations||[])
+   setConversations(current=>{
+    const incoming=d.conversations||[]
+    const map=new Map<string,Row>()
+    for(const item of current) map.set(String(item.conversation_id),item)
+    for(const item of incoming) map.set(String(item.conversation_id),item)
+    return [...map.values()].sort((a,b)=>new Date(b.last_message_at||0).getTime()-new Date(a.last_message_at||0).getTime())
+   })
+   setConversationPage(current=>append?Math.max(current,page):Math.max(current,page))
+   setConversationHasMore(Boolean(d.hasMore) || (Number(d.total||0)>30))
   }catch(e){setError(e instanceof Error?e.message:'Unable to load WhatsApp conversations.')}
   finally{setLoading(false)}
  }
- const loadMessages=async(id:number)=>{
-  setActiveId(id);setError('')
+
+ const loadMessages=async(id:number,before:string|null=null,older=false)=>{
+  if(older)setLoadingOlder(true)
+  else setActiveId(id)
+  setError('')
   try{
-   const r=await fetch('/api/admin/whatsapp/conversations/messages?conversationId='+id,{cache:'no-store',credentials:'same-origin'})
+   const query='/api/admin/whatsapp/conversations/messages?conversationId='+id+'&limit=50'+(before?'&before='+encodeURIComponent(before):'')
+   const r=await fetch(query,{cache:'no-store',credentials:'same-origin'})
    const d=await r.json().catch(()=>({}))
    if(!r.ok) throw new Error(d.message||'Unable to load conversation.')
-   setMessages(d.messages||[]);await loadConversations()
+   const incoming=d.messages||[]
+   if(older)setMessages(current=>[...incoming,...current.filter((m)=>!incoming.some((x:any)=>x.whatsapp_message_id===m.whatsapp_message_id))])
+   else setMessages(current=>{const map=new Map<string,Row>();for(const m of current)map.set(String(m.whatsapp_message_id),m);for(const m of incoming)map.set(String(m.whatsapp_message_id),m);return [...map.values()].sort((a,b)=>new Date(a.created_at||a.sent_at).getTime()-new Date(b.created_at||b.sent_at).getTime())})
+   setMessageHasMore(Boolean(d.hasMore))
+   setMessageBefore(d.nextBefore||null)
   }catch(e){setError(e instanceof Error?e.message:'Unable to load conversation.')}
+  finally{setLoadingOlder(false)}
  }
- useEffect(()=>{void loadConversations();const timer=window.setInterval(()=>void loadConversations(),5000);return()=>window.clearInterval(timer)},[])
- const active=conversations.find(x=>Number(x.conversation_id)===activeId)
+
+ useEffect(()=>{void loadConversations();const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void loadConversations()},15000);return()=>window.clearInterval(timer)},[])
  useEffect(()=>{
-  if(!activeId) return
-  const timer=window.setInterval(()=>void loadMessages(activeId),3000)
+  if(!activeId)return
+  const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void loadMessages(activeId)},8000)
   return()=>window.clearInterval(timer)
  },[activeId])
+
+ const active=conversations.find(x=>Number(x.conversation_id)===activeId)
  const sendReply=async()=>{
   const text=reply.trim()
   if(!activeId||!text||sending)return
@@ -173,25 +201,29 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
   }catch(e){setError(e instanceof Error?e.message:'Unable to send reply.')}
   finally{setSending(false)}
  }
+
  return <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
   <div className="grid min-h-[620px] md:grid-cols-[300px_minmax(0,1fr)]">
    <aside className="border-b border-slate-200 md:border-b-0 md:border-r">
     <div className="flex items-center justify-between border-b px-4 py-3"><div><h2 className="text-sm font-black">WhatsApp Inbox</h2><p className="text-[10px] text-slate-400">Incoming and outgoing messages</p></div><button onClick={()=>{setLoading(true);void loadConversations()}} className="rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700">Refresh</button></div>
-    {loading?<div className="p-5 text-xs text-slate-400">Loading conversations…</div>:conversations.length===0?<div className="p-5 text-xs text-slate-400">No WhatsApp conversations yet.</div>:<div className="max-h-[520px] overflow-y-auto">{conversations.map(x=>{const id=Number(x.conversation_id);const selected=id===activeId;const name=String(x.display_name||x.profile_name||x.phone||'Unknown');const preview=String(x.last_body||x.last_message_type||'Message');return <button key={id} onClick={()=>void loadMessages(id)} className={selected?'w-full border-b px-4 py-3 text-left bg-sky-50':'w-full border-b px-4 py-3 text-left bg-white hover:bg-slate-50'}>
+    {loading?<div className="p-5 text-xs text-slate-400">Loading conversations…</div>:conversations.length===0?<div className="p-5 text-xs text-slate-400">No WhatsApp conversations yet.</div>:<div className="max-h-[520px] overflow-y-auto">{conversations.map(x=>{const id=Number(x.conversation_id);const selected=id===activeId;const name=String(x.display_name||x.profile_name||x.phone||'Unknown');const preview=String(x.last_body||x.last_message_type||'Message');return <button key={id} onClick={()=>{setMessages([]);setMessageBefore(null);setMessageHasMore(false);void loadMessages(id)}} className={selected?'w-full border-b px-4 py-3 text-left bg-sky-50':'w-full border-b px-4 py-3 text-left bg-white hover:bg-slate-50'}>
       <div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-bold text-slate-800">{name}</span>{Number(x.unread_count||0)>0&&<span className="grid min-w-5 place-items-center rounded-full bg-sky-600 px-1.5 py-0.5 text-[9px] font-black text-white">{x.unread_count}</span>}</div>
       <div className="mt-0.5 truncate text-[10px] text-slate-500">{x.phone}</div><div className="mt-1 truncate text-[10px] text-slate-400">{preview}</div><div className="mt-1 text-[9px] text-slate-300">{dt(x.last_message_at)}</div>
-    </button>})}</div>}
+    </button>})}{conversationHasMore&&<button onClick={()=>void loadConversations(true)} className="w-full border-t px-4 py-3 text-[10px] font-bold text-sky-700">LOAD MORE CONVERSATIONS</button>}</div>}
    </aside>
    <section className="flex min-h-[620px] flex-col">
     {!active?<div className="grid flex-1 place-items-center p-8 text-center"><div><MessageCircle className="mx-auto mb-2 text-slate-300" size={32}/><p className="text-sm font-bold text-slate-500">Select a conversation</p><p className="mt-1 text-xs text-slate-400">Incoming WhatsApp replies will appear here.</p></div></div>:<>
       <div className="border-b px-4 py-3"><div className="text-sm font-black">{active.display_name||active.profile_name||active.phone}</div><div className="text-[10px] text-slate-400">{active.phone}{active.lead_id?' · Lead '+active.lead_id:''}</div></div>
-      <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">{messages.map(m=>{const outbound=String(m.direction||'').toUpperCase()==='OUTBOUND';return <div key={m.whatsapp_message_id} className={`flex w-full ${outbound?'justify-end':'justify-start'}`}>
+      <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
+       {messageHasMore&&<button disabled={loadingOlder} onClick={()=>messageBefore&&void loadMessages(activeId!,messageBefore,true)} className="mx-auto block rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-sky-700 shadow-sm disabled:opacity-50">{loadingOlder?'LOADING…':'LOAD OLDER MESSAGES'}</button>}
+       {messages.map(m=>{const outbound=String(m.direction||'').toUpperCase()==='OUTBOUND';return <div key={m.whatsapp_message_id} className={`flex w-full ${outbound?'justify-end':'justify-start'}`}>
         <div className={`max-w-[78%] rounded-2xl px-3 py-2 shadow-sm ${outbound?'bg-sky-600 text-white rounded-br-md':'bg-white text-slate-800 rounded-bl-md border border-slate-200'}`}>
           <div className="mb-0.5 text-[9px] font-bold opacity-60">{outbound?'You':'Customer'}</div>
           <div className="whitespace-pre-wrap break-words text-xs">{m.body||m.caption||m.message_type}</div>
           <div className={outbound?'mt-1 text-[9px] text-sky-100':'mt-1 text-[9px] text-slate-400'}>{dt(m.sent_at)}{outbound?' · '+String(m.delivery_status||'accepted'):''}</div>
         </div>
-      </div>})}</div>
+       </div>})}
+      </div>
       {error&&<div className="border-t bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
       <form onSubmit={e=>{e.preventDefault();void sendReply()}} className="flex gap-2 border-t bg-white p-3"><input value={reply} onChange={e=>setReply(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-sky-500"/><button disabled={sending||!reply.trim()} className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-600 text-white disabled:opacity-50"><Send size={15}/></button></form>
     </>}
@@ -219,7 +251,7 @@ function LeadInfo({label,value}:{label:string,value:any}){return <div className=
 function Info({label,value}:{label:string,value:any}){return <div className="rounded-xl bg-white p-2.5"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-0.5 break-words text-xs font-bold">{String(value??'—')}</p></div>}
 
 function NewLeadModal({form,setForm,close,create}:{form:Row,setForm:(v:any)=>void,close:()=>void,create:(e:any)=>void}){const fields=[['name','Name','text'],['phone','Number','tel'],['district','District','text'],['area','Place','text'],['recommended_kw','Plant (kW)','number'],['kseb_consumer_number','Consumer Number','text'],['remaining_transformer_capacity','Balance Available (kW)','number']] as const;return <Modal title="Add customer" eyebrow="New Lead" close={close}><form onSubmit={create} noValidate className="grid gap-2.5 sm:grid-cols-2">{fields.map(([key,label,type])=><label key={key} className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</span><input type={type} inputMode={type==='number'||type==='tel'?'numeric':undefined} value={String(form[key]??'')} onChange={e=>setForm({...form,[key]:e.target.value})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label>)}<label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Connection</span><select value={String(form.connection_category??'')} onChange={e=>setForm({...form,connection_category:e.target.value})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"><option value="">—</option><option>Domestic</option><option>Commercial</option></select></label><button type="submit" className="rounded-xl bg-sky-600 p-3 font-bold text-white sm:col-span-2">ADD LEAD</button></form></Modal>}
-function WhatsAppSendModal({lead,mode,setMode,message,setMessage,caption,setCaption,file,setFile,error,close,send}:{lead:Row,mode:'text'|'document'|'template',setMode:(v:'text'|'document'|'template')=>void,message:string,setMessage:(v:string)=>void,caption:string,setCaption:(v:string)=>void,file:File|null,setFile:(v:File|null)=>void,error:string,close:()=>void,send:(mode:'text'|'document'|'template')=>void}){const chooseMode=(v:'text'|'document'|'template')=>{setMode(v);if(v!=='document')setFile(null)};return <Modal title="WhatsApp" eyebrow="Lead communication" close={close}><div className="space-y-3"><div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-700">{String(lead.name||'Unnamed lead')}</p><p className="mt-1 text-xs text-slate-500">{String(lead.phone||'—')}</p></div><div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1"><button type="button" onClick={()=>chooseMode('text')} className={`rounded-lg px-2 py-2 text-[10px] font-bold ${mode==='text'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>MESSAGE</button><button type="button" onClick={()=>chooseMode('document')} className={`rounded-lg px-2 py-2 text-[10px] font-bold ${mode==='document'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>PDF</button><button type="button" onClick={()=>chooseMode('template')} className={`rounded-lg px-2 py-2 text-[10px] font-bold ${mode==='template'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>TEMPLATE</button></div>{mode==='text'&&<div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Message</p><textarea autoFocus value={message} onChange={e=>setMessage(e.target.value)} placeholder="Type your WhatsApp message..." className="min-h-32 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></div>}{mode==='document'&&<div className="space-y-2.5"><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">PDF</span><input type="file" accept="application/pdf,.pdf" onChange={e=>setFile(e.target.files?.[0]||null)} className="block w-full rounded-xl border border-slate-200 bg-white p-2 text-xs"/></label><p className="text-[10px] text-slate-400">PDF must be under 4 MB.</p><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Caption (optional)</span><textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Add a message with the PDF..." className="min-h-24 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label></div>}{mode==='template'&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold text-slate-700">Approved template</p><p className="mt-1 text-xs leading-5 text-slate-500">Sends your configured <b>disun_welcome_message</b> template with its image header.</p></div>}{error&&<div className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-700">{error}</div>}<div className="grid grid-cols-2 gap-2"><button type="button" onClick={close} className="rounded-xl border border-slate-200 p-3 text-sm font-bold text-slate-600">CANCEL</button><button type="button" disabled={mode==='text'&&!message.trim()||mode==='document'&&!file} onClick={()=>send(mode)} className="rounded-xl bg-sky-600 p-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{mode==='template'?'SEND TEMPLATE':mode==='document'?'SEND PDF':'SEND MESSAGE'}</button></div></div></Modal>}
+function WhatsAppSendModal({lead,mode,setMode,message,setMessage,caption,setCaption,file,setFile,error,sending,close,send}:{lead:Row,mode:'text'|'document'|'template',setMode:(v:'text'|'document'|'template')=>void,message:string,setMessage:(v:string)=>void,caption:string,setCaption:(v:string)=>void,file:File|null,setFile:(v:File|null)=>void,error:string,sending:boolean,close:()=>void,send:(mode:'text'|'document'|'template')=>void}){const chooseMode=(v:'text'|'document'|'template')=>{if(sending)return;setMode(v);if(v!=='document')setFile(null)};return <Modal title="WhatsApp" eyebrow="Lead communication" close={close}><div className="space-y-3"><div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-700">{String(lead.name||'Unnamed lead')}</p><p className="mt-1 text-xs text-slate-500">{String(lead.phone||'—')}</p></div><div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1"><button type="button" onClick={()=>chooseMode('text')} className={`rounded-lg px-2 py-2 text-[10px] font-bold ${mode==='text'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>MESSAGE</button><button type="button" onClick={()=>chooseMode('document')} className={`rounded-lg px-2 py-2 text-[10px] font-bold ${mode==='document'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>PDF</button><button type="button" onClick={()=>chooseMode('template')} className={`rounded-lg px-2 py-2 text-[10px] font-bold ${mode==='template'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>TEMPLATE</button></div>{mode==='text'&&<div><p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Message</p><textarea autoFocus value={message} onChange={e=>setMessage(e.target.value)} placeholder="Type your WhatsApp message..." className="min-h-32 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></div>}{mode==='document'&&<div className="space-y-2.5"><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">PDF</span><input type="file" accept="application/pdf,.pdf" onChange={e=>setFile(e.target.files?.[0]||null)} className="block w-full rounded-xl border border-slate-200 bg-white p-2 text-xs"/></label><p className="text-[10px] text-slate-400">PDF must be under 4 MB.</p><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Caption (optional)</span><textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Add a message with the PDF..." className="min-h-24 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label></div>}{mode==='template'&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold text-slate-700">Approved template</p><p className="mt-1 text-xs leading-5 text-slate-500">Sends your configured <b>disun_welcome_message</b> template with its image header.</p></div>}{error&&<div className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-700">{error}</div>}<div className="grid grid-cols-2 gap-2"><button type="button" disabled={sending} onClick={close} className="rounded-xl border border-slate-200 p-3 text-sm font-bold text-slate-600 disabled:opacity-40">CANCEL</button><button type="button" disabled={sending||mode==='text'&&!message.trim()||mode==='document'&&!file} onClick={()=>send(mode)} className="rounded-xl bg-sky-600 p-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{sending?'SENDING…':mode==='template'?'SEND TEMPLATE':mode==='document'?'SEND PDF':'SEND MESSAGE'}</button></div></div></Modal>}
 
 function EditLeadModal({lead,setLead,close,save}:{lead:Row,setLead:(v:any)=>void,close:()=>void,save:(e:any)=>void}){const place=[lead.area,lead.district].filter(Boolean).join(', ');const mapsUrl=place?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(place+', Kerala'):null;return <Modal title={String(lead.name||'Unnamed lead')} eyebrow="Edit Lead" close={close}><form onSubmit={save} className="grid gap-2.5 sm:grid-cols-2"><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Number</span><input type="tel" inputMode="numeric" maxLength={10} value={String(lead.phone??'')} onChange={e=>setLead({...lead,phone:e.target.value.replace(/\D/g,'').slice(0,10)})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Place</span><input required value={String(lead.area??'')} onChange={e=>setLead({...lead,area:e.target.value})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Plant</span><input required type="number" value={String(lead.recommended_kw??'')} onChange={e=>setLead({...lead,recommended_kw:e.target.value})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Consumer Number</span><input value={String(lead.kseb_consumer_number??'')} onChange={e=>setLead({...lead,kseb_consumer_number:e.target.value})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/></label><label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Balance Available</span><div className="relative"><input type="number" step="any" value={String(lead.remaining_transformer_capacity??'')} onChange={e=>setLead({...lead,remaining_transformer_capacity:e.target.value})} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">kW</span></div></label><label className="block sm:col-span-2"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Payment</span><div className="relative"><input type="number" min="0" step="0.01" value={String(lead.payment_amount??'')} onChange={e=>setLead({...lead,payment_amount:e.target.value})} placeholder="0" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">₹</span></div></label><div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">Location</span>{mapsUrl?<a target="_blank" rel="noreferrer" href={mapsUrl} className="mt-1 block text-sm font-medium text-slate-600 underline">Open in Maps</a>:<span className="mt-1 block text-sm text-slate-400">—</span>}</div><button className="rounded-xl bg-sky-600 p-3 font-bold text-white sm:col-span-2">SAVE CHANGES</button></form></Modal>}
 

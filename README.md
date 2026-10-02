@@ -1,33 +1,49 @@
-# disunnewui
+# DiSun Energy International — Solar Website
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Production Next.js application for the DiSun Energy International solar customer journey, including solar calculation, KSEB transformer feasibility, document eligibility, site-visit booking, and the admin/WhatsApp workflow.
 
-## Built with v0
+## Stack
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+- Next.js 16.3.8
+- React 19
+- TypeScript
+- Tailwind CSS
+- Neon Postgres
+- WhatsApp Cloud API
+- Google Sheets synchronization
+- Vercel
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_XQXjTe2IIkRAlshvhBsOUpRCHKFk)
-
-## Getting Started
-
-First, run the development server:
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Schema changes are managed outside request handling.
 
-## Learn More
+Run the migration explicitly before starting production traffic:
 
-To learn more, take a look at the following resources:
+```bash
+pnpm db:migrate
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+The application expects the database schema to already exist; API requests do not create or alter tables.
+
+## Quality checks
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+GitHub Actions runs these checks automatically for pushes to `Main` and `Fixed`, and for pull requests targeting `Main`.
+
+## Deployment
+
+Vercel handles the Next.js deployment. Follow-up reminders are scheduled through the repository's `vercel.json` Cron configuration and require `CRON_SECRET` plus the relevant WhatsApp environment variables.
+
+Do not commit production secrets or service-account credentials to the repository.

@@ -15,18 +15,32 @@ const migrations = [
   `CREATE TABLE IF NOT EXISTS admin_audit_logs (id BIGSERIAL PRIMARY KEY, action TEXT NOT NULL, lead_id TEXT, details JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE TABLE IF NOT EXISTS lead_audit_log (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, field TEXT NOT NULL, old_value TEXT, new_value TEXT, changed_by_name TEXT NOT NULL, changed_by_email TEXT NOT NULL, changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE TABLE IF NOT EXISTS admin_tasks (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, note TEXT, task_date DATE NOT NULL DEFAULT CURRENT_DATE, number TEXT, place TEXT, stage TEXT, plant TEXT, payment TEXT, source TEXT, status TEXT NOT NULL DEFAULT 'PENDING', created_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ)`,
-  `CREATE TABLE IF NOT EXISTS lead_followups (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, note TEXT, follow_up_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', reminder_sent_at TIMESTAMPTZ, created_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ)`,
+  `CREATE TABLE IF NOT EXISTS lead_followups (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, note TEXT, follow_up_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', reminder_sent_at TIMESTAMPTZ, reminder_processing_at TIMESTAMPTZ, created_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ)`,
   `ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ`,
+  `ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS reminder_processing_at TIMESTAMPTZ`,
   `CREATE TABLE IF NOT EXISTS lead_payments (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, amount NUMERIC(12,2) NOT NULL, paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), method TEXT, note TEXT, recorded_by_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE TABLE IF NOT EXISTS lead_project_stages (id SERIAL PRIMARY KEY, lead_id TEXT NOT NULL, stage TEXT NOT NULL, note TEXT, stage_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), recorded_by_name TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS api_rate_limits (rate_key TEXT NOT NULL, window_start TIMESTAMPTZ NOT NULL, request_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (rate_key, window_start))`,
   `CREATE INDEX IF NOT EXISTS lead_audit_log_lead_id_idx ON lead_audit_log (lead_id)`,
   `CREATE INDEX IF NOT EXISTS lead_followups_due_reminder_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING' AND reminder_sent_at IS NULL`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS site_visits_slot_unique ON site_visits (phone, preferred_date, preferred_time)`,
+  `DROP INDEX IF EXISTS site_visits_slot_unique`,
+  `UPDATE site_visits sv SET status = 'CANCELLED' WHERE status = 'BOOKED' AND EXISTS (SELECT 1 FROM site_visits newer WHERE newer.status = 'BOOKED' AND newer.preferred_date = sv.preferred_date AND newer.preferred_time = sv.preferred_time AND newer.created_at > sv.created_at)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS site_visits_slot_unique ON site_visits (preferred_date, preferred_time) WHERE status = 'BOOKED'`,
+  `DELETE FROM lead_audit_log WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_audit_log.lead_id)`,
+  `DELETE FROM lead_followups WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_followups.lead_id)`,
+  `DELETE FROM lead_payments WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_payments.lead_id)`,
+  `DELETE FROM lead_project_stages WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_project_stages.lead_id)`,
+  `ALTER TABLE lead_audit_log ADD CONSTRAINT lead_audit_log_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
+  `ALTER TABLE lead_followups ADD CONSTRAINT lead_followups_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
+  `ALTER TABLE lead_payments ADD CONSTRAINT lead_payments_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
+  `ALTER TABLE lead_project_stages ADD CONSTRAINT lead_project_stages_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
   `CREATE INDEX IF NOT EXISTS leads_status_idx ON leads (lead_status)`,
   `CREATE INDEX IF NOT EXISTS leads_updated_idx ON leads (updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS lead_events_lead_idx ON lead_events (lead_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS api_rate_limits_window_idx ON api_rate_limits (window_start)`,
+  `CREATE TABLE IF NOT EXISTS whatsapp_webhook_events (id BIGSERIAL PRIMARY KEY, event_type TEXT NOT NULL, message_id TEXT, phone_number_id TEXT, payload JSONB NOT NULL, received_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
+  `CREATE INDEX IF NOT EXISTS whatsapp_webhook_events_message_idx ON whatsapp_webhook_events (message_id, received_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS whatsapp_webhook_events_type_idx ON whatsapp_webhook_events (event_type, received_at DESC)`,
   `CREATE TABLE IF NOT EXISTS whatsapp_contacts (id BIGSERIAL PRIMARY KEY, phone TEXT NOT NULL UNIQUE, lead_id TEXT REFERENCES leads(lead_id) ON DELETE SET NULL, display_name TEXT, profile_name TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE TABLE IF NOT EXISTS whatsapp_conversations (id BIGSERIAL PRIMARY KEY, contact_id BIGINT NOT NULL UNIQUE REFERENCES whatsapp_contacts(id) ON DELETE CASCADE, status TEXT NOT NULL DEFAULT 'OPEN', unread_count INTEGER NOT NULL DEFAULT 0, last_message_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE TABLE IF NOT EXISTS whatsapp_messages (id BIGSERIAL PRIMARY KEY, conversation_id BIGINT NOT NULL REFERENCES whatsapp_conversations(id) ON DELETE CASCADE, whatsapp_message_id TEXT NOT NULL UNIQUE, direction TEXT NOT NULL CHECK (direction IN ('INBOUND','OUTBOUND')), message_type TEXT NOT NULL, body TEXT, media_id TEXT, caption TEXT, delivery_status TEXT NOT NULL DEFAULT 'accepted', sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), delivered_at TIMESTAMPTZ, read_at TIMESTAMPTZ, failed_at TIMESTAMPTZ, error_payload JSONB, raw_payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), status_at TIMESTAMPTZ)`,
@@ -38,7 +52,14 @@ const migrations = [
 
 ]
 
-for (const statement of migrations) await sql.unsafe(statement)
+for (const statement of migrations) {
+  try {
+    await sql.unsafe(statement)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!/already exists|duplicate_object/i.test(message)) throw error
+  }
+}
 
 const requiredTables = [
   'leads',

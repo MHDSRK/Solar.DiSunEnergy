@@ -7,17 +7,42 @@ function makeLeadId(){const d=new Date().toISOString().slice(0,10).replace(/-/g,
 const fields=['name','phone','district','area','connection_category','recommended_kw','kseb_consumer_number','remaining_transformer_capacity']
 function unauthorized(e:unknown){return e instanceof Error&&e.message==='UNAUTHORIZED'}
 
-export async function GET(){
+export async function GET(request: Request){
  try{
   await requireAdmin(); await ensureLeadTable(); const sql=getSql()
-  const leads=(await sql`SELECT * FROM leads ORDER BY created_at DESC`) as Record<string,any>[]
-  const audit=(await sql`SELECT * FROM lead_audit_log ORDER BY changed_at DESC`) as Record<string,any>[]
-  const followups=(await sql`SELECT * FROM lead_followups ORDER BY follow_up_at ASC`) as Record<string,any>[]
-  const payments=(await sql`SELECT * FROM lead_payments ORDER BY paid_at DESC`) as Record<string,any>[]
-  const stages=(await sql`SELECT * FROM lead_project_stages ORDER BY stage_at ASC`) as Record<string,any>[]
-  const docs=(await sql`SELECT lead_id,document_type,file_name,mime_type,size_bytes,uploaded_at FROM lead_documents ORDER BY uploaded_at DESC`) as Record<string,any>[]
-  const visits=(await sql`SELECT * FROM site_visits ORDER BY created_at DESC`) as Record<string,any>[]
-  return NextResponse.json({success:true,leads,audit,followups,payments,stages,documents:docs,siteVisits:visits,stats:{total:leads.length,contact:leads.filter(x=>x.name||x.phone).length,calculated:leads.filter(x=>x.recommended_kw!=null).length,feasibility:leads.filter(x=>x.feasibility_status!=null).length}})
+  const params=new URL(request.url).searchParams
+  const page=Math.max(1,Number(params.get('page')||'1')||1)
+  const pageSize=Math.min(100,Math.max(1,Number(params.get('pageSize')||'50')||50))
+  const offset=(page-1)*pageSize
+  const leads=(await sql.query('SELECT * FROM leads ORDER BY created_at DESC LIMIT $1 OFFSET $2',[pageSize,offset])) as Record<string,any>[]
+  const totalRows=(await sql`SELECT COUNT(*)::int AS total FROM leads`) as Record<string,any>[]
+  const total=Number(totalRows[0]?.total||0)
+  const leadIds=leads.map((lead)=>String(lead.lead_id))
+  let audit:Record<string,any>[]=[]
+  let followups:Record<string,any>[]=[]
+  let payments:Record<string,any>[]=[]
+  let stages:Record<string,any>[]=[]
+  let docs:Record<string,any>[]=[]
+  let visits:Record<string,any>[]=[]
+  if(leadIds.length){
+   const ids=leadIds
+   audit=(await sql.query('SELECT * FROM lead_audit_log WHERE lead_id = ANY($1::text[]) ORDER BY changed_at DESC', [ids])) as Record<string,any>[]
+   followups=(await sql.query('SELECT * FROM lead_followups WHERE lead_id = ANY($1::text[]) ORDER BY follow_up_at ASC', [ids])) as Record<string,any>[]
+   payments=(await sql.query('SELECT * FROM lead_payments WHERE lead_id = ANY($1::text[]) ORDER BY paid_at DESC', [ids])) as Record<string,any>[]
+   stages=(await sql.query('SELECT * FROM lead_project_stages WHERE lead_id = ANY($1::text[]) ORDER BY stage_at ASC', [ids])) as Record<string,any>[]
+   docs=(await sql.query('SELECT lead_id,document_type,file_name,mime_type,size_bytes,uploaded_at FROM lead_documents WHERE lead_id = ANY($1::text[]) ORDER BY uploaded_at DESC', [ids])) as Record<string,any>[]
+   visits=(await sql.query('SELECT * FROM site_visits WHERE lead_id = ANY($1::text[]) ORDER BY created_at DESC', [ids])) as Record<string,any>[]
+  }
+  const statsRows=(await sql`
+   SELECT
+    COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE name IS NOT NULL OR phone IS NOT NULL)::int AS contact,
+    COUNT(*) FILTER (WHERE recommended_kw IS NOT NULL)::int AS calculated,
+    COUNT(*) FILTER (WHERE feasibility_status IS NOT NULL)::int AS feasibility
+   FROM leads
+  `) as Record<string,any>[]
+  const stats=statsRows[0]||{total:0,contact:0,calculated:0,feasibility:0}
+  return NextResponse.json({success:true,leads,audit,followups,payments,stages,documents:docs,siteVisits:visits,page,pageSize,total,hasMore:offset+leads.length<total,stats})
  }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to load leads.'},{status:unauthorized(e)?401:500})}
 }
 
@@ -39,11 +64,21 @@ export async function POST(request:Request){
 
 export async function DELETE(request:Request){
  try{
-  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json(); const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
+  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json()
+  const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
   if(!ids.length) return NextResponse.json({success:false,message:'No leads selected.'},{status:400})
-  const rows=(await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`) as Record<string,any>[]
-  for(const row of rows) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
-  await getSql()`DELETE FROM leads WHERE lead_id = ANY(${ids}::text[])`
+  const sql=getSql()
+  const rows=(await sql.query('SELECT lead_id FROM leads WHERE lead_id = ANY($1::text[])',[ids])) as Record<string,any>[]
+  await sql.transaction(ids.flatMap((id: string) => [
+    sql`DELETE FROM lead_audit_log WHERE lead_id = ${id}`,
+    sql`DELETE FROM lead_followups WHERE lead_id = ${id}`,
+    sql`DELETE FROM lead_payments WHERE lead_id = ${id}`,
+    sql`DELETE FROM lead_project_stages WHERE lead_id = ${id}`,
+    sql`DELETE FROM leads WHERE lead_id = ${id}`,
+  ]))
+  for(const row of rows){
+    await sql.query('INSERT INTO admin_audit_logs (action,lead_id,details,created_at) VALUES ($1,$2,$3::jsonb,NOW())',['lead_deleted',String(row.lead_id),JSON.stringify({deletedBy:actor.name,deletedByEmail:actor.email})])
+  }
   return NextResponse.json({success:true,deleted:rows.length})
  }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to delete leads.'},{status:unauthorized(e)?401:500})}
 }

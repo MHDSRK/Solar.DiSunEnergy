@@ -48,6 +48,11 @@ export function validateSiteVisitSlot(date: string, time: string, now = new Date
   const normalizedToday = indiaNow.replace(/\//g, '-')
   if (date < normalizedToday) errors.push('Preferred date cannot be in the past.')
 
+  const currentTime = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(now)
+  const currentParts = currentTime.split(':').map(Number)
+  const currentMinutes = currentParts[0] * 60 + currentParts[1]
+  if (date === normalizedToday && minutes <= currentMinutes) errors.push('Preferred time must be later than the current time.')
+
   const weekday = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
     weekday: 'short',

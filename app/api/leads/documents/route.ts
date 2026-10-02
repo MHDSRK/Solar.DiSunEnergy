@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { verifyLeadToken } from '@/lib/leadAuth'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit'
@@ -72,7 +72,12 @@ export async function POST(request: Request) {
       await getSql()`UPDATE leads SET documents_completed_at = COALESCE(documents_completed_at, NOW()), lead_status = CASE WHEN lead_status NOT IN ('CONVERTED','CANCELLED','SITE_VISIT_BOOKED') THEN 'DOCUMENTS_RECEIVED' ELSE lead_status END, updated_at = NOW() WHERE lead_id = ${leadId}`
       const leadRows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
       const lead = (leadRows as unknown as Record<string, unknown>[])[0]
-      if (lead) void notifyLeadEvent('documents', lead).catch((error) => console.error('Document notifications failed', error))
+      if (lead) {
+        after(async () => {
+          try { await notifyLeadEvent('documents', lead) }
+          catch (error) { console.error('Document notifications failed', error) }
+        })
+      }
     }
 
     return NextResponse.json({ success: true, documentType, fileName: file.name })

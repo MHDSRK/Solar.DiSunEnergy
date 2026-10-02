@@ -153,7 +153,10 @@ function leadRow(lead: LeadRecord) {
 async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>>) {
   const range = `${encodeURIComponent(config.leadSheet)}!A1:AI1`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
-  if ((data.values?.[0]?.length ?? 0) >= LEAD_COLUMNS.length) return
+  const current = data.values?.[0] ?? []
+  const matches = LEAD_COLUMNS.every((column, index) => String(current[index] ?? '').trim() === column)
+  if (matches) return
+
   await sheetsRequest(config, `/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ range: `${config.leadSheet}!A1:AI1`, majorDimension: 'ROWS', values: [LEAD_COLUMNS] }),
@@ -161,10 +164,22 @@ async function ensureLeadHeader(config: NonNullable<ReturnType<typeof getConfig>
 }
 
 async function findLeadRow(config: NonNullable<ReturnType<typeof getConfig>>, leadId: string) {
-  const range = `${encodeURIComponent(config.leadSheet)}!B:B`
+  const range = `${encodeURIComponent(config.leadSheet)}!A:AI`
   const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
-  const index = (data.values || []).findIndex((row) => String(row[0] ?? '').trim() === leadId)
+  const index = (data.values || []).findIndex((row, rowIndex) =>
+    rowIndex >= 1 && (String(row[2] ?? '').trim() === leadId || String(row[3] ?? '').trim() === leadId),
+  )
   return index >= 1 ? index + 1 : null
+}
+
+async function findNextLeadRow(config: NonNullable<ReturnType<typeof getConfig>>) {
+  const range = `${encodeURIComponent(config.leadSheet)}!A:AI`
+  const data = await sheetsRequest<{ values?: string[][] }>(config, `/values/${range}`)
+  let lastRow = 1
+  for (let index = 1; index < (data.values || []).length; index += 1) {
+    if ((data.values?.[index] || []).some((value) => String(value ?? '').trim() !== '')) lastRow = index + 1
+  }
+  return Math.max(2, lastRow + 1)
 }
 
 export async function syncLeadToGoogleSheet(lead: LeadRecord) {
@@ -177,17 +192,11 @@ export async function syncLeadToGoogleSheet(lead: LeadRecord) {
 
   const row = leadRow(lead)
   const existingRow = await findLeadRow(config, leadId)
-  if (existingRow) {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${existingRow}:AI${existingRow}?valueInputOption=USER_ENTERED`, {
-      method: 'PUT',
-      body: JSON.stringify({ range: `${config.leadSheet}!A${existingRow}:AI${existingRow}`, majorDimension: 'ROWS', values: [row] }),
-    })
-  } else {
-    await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A:AI:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
-      method: 'POST',
-      body: JSON.stringify({ majorDimension: 'ROWS', values: [row] }),
-    })
-  }
+  const rowNumber = existingRow ?? await findNextLeadRow(config)
+  await sheetsRequest(config, `/values/${encodeURIComponent(config.leadSheet)}!A${rowNumber}:AI${rowNumber}?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: JSON.stringify({ range: `${config.leadSheet}!A${rowNumber}:AI${rowNumber}`, majorDimension: 'ROWS', values: [row] }),
+  })
   return { configured: true, saved: true }
 }
 

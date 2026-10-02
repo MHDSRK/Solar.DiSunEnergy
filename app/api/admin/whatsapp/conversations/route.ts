@@ -5,34 +5,20 @@ import { requireAdmin } from '@/lib/adminAuth'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await requireAdmin()
+    const params = new URL(request.url).searchParams
+    const page = Math.max(1, Number(params.get('page') || '1') || 1)
+    const pageSize = Math.min(50, Math.max(1, Number(params.get('pageSize') || '30') || 30))
+    const offset = (page - 1) * pageSize
     const rows = await getSql().query(
-      `SELECT
-         c.id AS conversation_id,
-         c.status,
-         c.unread_count,
-         c.last_message_at,
-         ct.phone,
-         ct.display_name,
-         ct.profile_name,
-         ct.lead_id,
-         m.body AS last_body,
-         m.message_type AS last_message_type,
-         m.direction AS last_direction
-       FROM whatsapp_conversations c
-       JOIN whatsapp_contacts ct ON ct.id = c.contact_id
-       LEFT JOIN LATERAL (
-         SELECT body, message_type, direction
-         FROM whatsapp_messages
-         WHERE conversation_id = c.id
-         ORDER BY created_at DESC
-         LIMIT 1
-       ) m ON true
-       ORDER BY c.last_message_at DESC NULLS LAST, c.updated_at DESC`,
+      'SELECT c.id AS conversation_id, c.status, c.unread_count, c.last_message_at, ct.phone, ct.display_name, ct.profile_name, ct.lead_id, m.body AS last_body, m.message_type AS last_message_type, m.direction AS last_direction FROM whatsapp_conversations c JOIN whatsapp_contacts ct ON ct.id = c.contact_id LEFT JOIN LATERAL (SELECT body, message_type, direction FROM whatsapp_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) m ON true ORDER BY c.last_message_at DESC NULLS LAST, c.updated_at DESC LIMIT $1 OFFSET $2',
+      [pageSize, offset],
     ) as Record<string, any>[]
-    return NextResponse.json({ success: true, conversations: rows })
+    const totalRows = await getSql().query('SELECT COUNT(*)::int AS total FROM whatsapp_conversations') as Record<string, any>[]
+    const total = Number(totalRows[0]?.total || 0)
+    return NextResponse.json({ success: true, conversations: rows, page, pageSize, total, hasMore: offset + rows.length < total })
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     console.error('WhatsApp conversations lookup failed', error)
