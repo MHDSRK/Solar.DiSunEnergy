@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { resolveKsebSection } from '../services/kseb/recapClient'
+import { resolveKsebSection } from '../services/kseb/recapClient.ts'
 
 test('keeps KSEB district ID and district name in their correct fields', async () => {
   const section = await resolveKsebSection({
