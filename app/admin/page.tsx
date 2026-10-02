@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, History, Pencil, Plus, Send, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, History, MessageCircle, Pencil, Plus, Send, Trash2, X } from 'lucide-react'
 
 type Row = Record<string, any>
 const STAGES = ['SITE_SURVEY','MATERIAL_ORDERED','INSTALLATION_STARTED','INSTALLATION_COMPLETE','NET_METER_APPLIED','COMMISSIONED']
@@ -15,7 +15,7 @@ const taskDateTime = (v:any) => { const s=taskDateValue(v); return s?new Date(`$
 export default function Admin(){
  const[session,setSession]=useState<any>(null),[password,setPassword]=useState(''),[err,setErr]=useState(''),[notice,setNotice]=useState(''); const loginInFlight=useRef(false)
  const[leads,setLeads]=useState<Row[]>([]),[audit,setAudit]=useState<Row[]>([]),[payments,setPayments]=useState<Row[]>([]),[stages,setStages]=useState<Row[]>([]),[tasks,setTasks]=useState<Row[]>([])
- const[tab,setTab]=useState<'TASKS'|'LEADS'>('TASKS'),[leadSection,setLeadSection]=useState<'SELECTED'|'ALL'>('SELECTED'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
+ const[tab,setTab]=useState<'TASKS'|'LEADS'|'WHATSAPP'>('TASKS'),[leadSection,setLeadSection]=useState<'SELECTED'|'ALL'>('SELECTED'),[historyOpen,setHistoryOpen]=useState(false),[deleteMode,setDeleteMode]=useState(false),[selectedIds,setSelectedIds]=useState<string[]>([])
  const[expandedId,setExpandedId]=useState<string|null>(null),[newLeadOpen,setNewLeadOpen]=useState(false),[editLead,setEditLead]=useState<Row|null>(null),[whatsappLead,setWhatsappLead]=useState<Row|null>(null),[whatsappMode,setWhatsappMode]=useState<'text'|'document'|'template'>('text'),[whatsappMessage,setWhatsappMessage]=useState(''),[whatsappCaption,setWhatsappCaption]=useState(''),[whatsappFile,setWhatsappFile]=useState<File|null>(null),[whatsappError,setWhatsappError]=useState(''),[paymentLead,setPaymentLead]=useState<string|null>(null),[paymentAmount,setPaymentAmount]=useState(""),[paymentMethod,setPaymentMethod]=useState(""),[paymentNote,setPaymentNote]=useState(""),[stageLead,setStageLead]=useState<string|null>(null),[customStageOpen,setCustomStageOpen]=useState(false),[customStage,setCustomStage]=useState('')
  const[form,setForm]=useState({name:'',phone:'',district:'',area:'',connection_category:'',recommended_kw:'',kseb_consumer_number:'',remaining_transformer_capacity:''})
  const[taskModal,setTaskModal]=useState<Row|null>(null),[addTaskMode,setAddTaskMode]=useState<'CHOOSER'|'NEW'|'EXISTING'|null>(null)
@@ -69,9 +69,10 @@ export default function Admin(){
  if(!session.authenticated)return <main className="min-h-dvh grid place-items-center bg-slate-950 p-5"><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-6 text-slate-900 shadow-2xl"><h1 className="mt-1 text-2xl font-black">Admin Panel</h1><input required autoFocus type="password" placeholder="Enter admin password" value={password} onChange={e=>setPassword(e.target.value)} className="mt-6 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none focus:border-sky-500"/>{err&&<p className="mt-2 text-sm text-red-600">{err}</p>}<button className="mt-4 w-full rounded-2xl bg-sky-600 py-3 font-bold text-white">LOGIN</button></form></main>
 
  return <main className="min-h-dvh bg-slate-100 text-slate-900"><div className="mx-auto min-h-dvh max-w-5xl">
- <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6"><div className="relative flex min-h-10 items-center justify-center"><h1 className="text-xl font-black sm:text-2xl">Admin Panel</h1><div className="absolute right-0 flex items-center gap-2"><span className="text-xs font-bold text-slate-700 sm:text-sm">{session.name}</span><button onClick={async()=>{await fetch('/api/admin/logout',{method:'POST'});location.reload()}} className="rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white">Logout</button></div></div><nav className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1"><button onClick={()=>setTab('TASKS')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='TASKS'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>TO DO LIST<span className="ml-1 text-[10px] opacity-60">({tasks.filter(x=>x.status!=='DONE').length})</span></button><button onClick={()=>setTab('LEADS')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='LEADS'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All Leads<span className="ml-1 text-[10px] opacity-60">({leads.length})</span></button></nav></header>
+ <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6"><div className="relative flex min-h-10 items-center justify-center"><h1 className="text-xl font-black sm:text-2xl">Admin Panel</h1><div className="absolute right-0 flex items-center gap-2"><span className="text-xs font-bold text-slate-700 sm:text-sm">{session.name}</span><button onClick={async()=>{await fetch('/api/admin/logout',{method:'POST'});location.reload()}} className="rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white">Logout</button></div></div><nav className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1"><button onClick={()=>setTab('TASKS')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='TASKS'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>TO DO LIST<span className="ml-1 text-[10px] opacity-60">({tasks.filter(x=>x.status!=='DONE').length})</span></button><button onClick={()=>setTab('LEADS')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='LEADS'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}>All Leads<span className="ml-1 text-[10px] opacity-60">({leads.length})</span></button><button onClick={()=>setTab('WHATSAPP')} className={`rounded-xl px-2 py-2 text-[11px] font-bold sm:text-xs ${tab==='WHATSAPP'?'bg-white text-sky-700 shadow-sm':'text-slate-500'}`}><span className="inline-flex items-center gap-1"><MessageCircle size={12}/> WhatsApp</span></button></nav></header>
  <section className="px-3 py-3 sm:px-6">{notice&&<div className="mb-3 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={16}/></button></div>}
  {tab==='TASKS'&&<TaskList tasks={tasks} openTask={(t)=>setTaskModal(t)} addTask={openAddTask} completeTask={completeTask} deleteTask={deleteTask}/>}
+ {tab==='WHATSAPP'&&<WhatsAppInbox onNotice={setNotice}/>}
  {tab==='LEADS'&&<>
   <div className="mb-3 flex items-center justify-between">
    <div><h2 className="text-[11px] font-medium text-slate-500">All Leads</h2><p className="text-[9px] text-slate-400">{leads.length} total leads</p></div>
@@ -123,6 +124,72 @@ export default function Admin(){
  </section>
  </div>
  </main>
+}
+
+function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
+ const [conversations,setConversations]=useState<Row[]>([])
+ const [messages,setMessages]=useState<Row[]>([])
+ const [activeId,setActiveId]=useState<number|null>(null)
+ const [reply,setReply]=useState('')
+ const [loading,setLoading]=useState(true)
+ const [sending,setSending]=useState(false)
+ const [error,setError]=useState('')
+
+ const loadConversations=async()=>{
+  try{
+   const r=await fetch('/api/admin/whatsapp/conversations',{cache:'no-store',credentials:'same-origin'})
+   const d=await r.json().catch(()=>({}))
+   if(!r.ok) throw new Error(d.message||'Unable to load WhatsApp conversations.')
+   setConversations(d.conversations||[])
+  }catch(e){setError(e instanceof Error?e.message:'Unable to load WhatsApp conversations.')}
+  finally{setLoading(false)}
+ }
+ const loadMessages=async(id:number)=>{
+  setActiveId(id);setError('')
+  try{
+   const r=await fetch('/api/admin/whatsapp/conversations/messages?conversationId='+id,{cache:'no-store',credentials:'same-origin'})
+   const d=await r.json().catch(()=>({}))
+   if(!r.ok) throw new Error(d.message||'Unable to load conversation.')
+   setMessages(d.messages||[]);await loadConversations()
+  }catch(e){setError(e instanceof Error?e.message:'Unable to load conversation.')}
+ }
+ useEffect(()=>{void loadConversations();const timer=window.setInterval(()=>void loadConversations(),5000);return()=>window.clearInterval(timer)},[])
+ const active=conversations.find(x=>Number(x.conversation_id)===activeId)
+ const sendReply=async()=>{
+  const text=reply.trim()
+  if(!activeId||!text||sending)return
+  setSending(true);setError('')
+  try{
+   const r=await fetch('/api/admin/whatsapp/reply',{method:'POST',headers:{'content-type':'application/json'},credentials:'same-origin',body:JSON.stringify({conversationId:activeId,message:text})})
+   const d=await r.json().catch(()=>({}))
+   if(!r.ok)throw new Error(d.message||'Unable to send reply.')
+   setReply('');onNotice('WhatsApp reply accepted by Meta — waiting for delivery.')
+   await loadMessages(activeId)
+  }catch(e){setError(e instanceof Error?e.message:'Unable to send reply.')}
+  finally{setSending(false)}
+ }
+ return <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div className="grid min-h-[620px] md:grid-cols-[300px_minmax(0,1fr)]">
+   <aside className="border-b border-slate-200 md:border-b-0 md:border-r">
+    <div className="flex items-center justify-between border-b px-4 py-3"><div><h2 className="text-sm font-black">WhatsApp Inbox</h2><p className="text-[10px] text-slate-400">Incoming and outgoing messages</p></div><button onClick={()=>{setLoading(true);void loadConversations()}} className="rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700">Refresh</button></div>
+    {loading?<div className="p-5 text-xs text-slate-400">Loading conversations…</div>:conversations.length===0?<div className="p-5 text-xs text-slate-400">No WhatsApp conversations yet.</div>:<div className="max-h-[520px] overflow-y-auto">{conversations.map(x=>{const id=Number(x.conversation_id);const selected=id===activeId;const name=String(x.display_name||x.profile_name||x.phone||'Unknown');const preview=String(x.last_body||x.last_message_type||'Message');return <button key={id} onClick={()=>void loadMessages(id)} className={selected?'w-full border-b px-4 py-3 text-left bg-sky-50':'w-full border-b px-4 py-3 text-left bg-white hover:bg-slate-50'}>
+      <div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-bold text-slate-800">{name}</span>{Number(x.unread_count||0)>0&&<span className="grid min-w-5 place-items-center rounded-full bg-sky-600 px-1.5 py-0.5 text-[9px] font-black text-white">{x.unread_count}</span>}</div>
+      <div className="mt-0.5 truncate text-[10px] text-slate-500">{x.phone}</div><div className="mt-1 truncate text-[10px] text-slate-400">{preview}</div><div className="mt-1 text-[9px] text-slate-300">{dt(x.last_message_at)}</div>
+    </button>})}</div>}
+   </aside>
+   <section className="flex min-h-[620px] flex-col">
+    {!active?<div className="grid flex-1 place-items-center p-8 text-center"><div><MessageCircle className="mx-auto mb-2 text-slate-300" size={32}/><p className="text-sm font-bold text-slate-500">Select a conversation</p><p className="mt-1 text-xs text-slate-400">Incoming WhatsApp replies will appear here.</p></div></div>:<>
+      <div className="border-b px-4 py-3"><div className="text-sm font-black">{active.display_name||active.profile_name||active.phone}</div><div className="text-[10px] text-slate-400">{active.phone}{active.lead_id?' · Lead '+active.lead_id:''}</div></div>
+      <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50 p-4">{messages.map(m=><div key={m.whatsapp_message_id} className={m.direction==='OUTBOUND'?'flex justify-end':'flex justify-start'}><div className={m.direction==='OUTBOUND'?'max-w-[80%] rounded-2xl px-3 py-2 shadow-sm bg-sky-600 text-white':'max-w-[80%] rounded-2xl px-3 py-2 shadow-sm bg-white text-slate-800'}>
+        <div className="whitespace-pre-wrap text-xs">{m.body||m.caption||m.message_type}</div>
+        <div className={m.direction==='OUTBOUND'?'mt-1 text-[9px] text-sky-100':'mt-1 text-[9px] text-slate-400'}>{dt(m.sent_at)}{m.direction==='OUTBOUND'?' · '+String(m.delivery_status||'accepted'):''}</div>
+      </div></div>)}</div>
+      {error&&<div className="border-t bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
+      <form onSubmit={e=>{e.preventDefault();void sendReply()}} className="flex gap-2 border-t bg-white p-3"><input value={reply} onChange={e=>setReply(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-sky-500"/><button disabled={sending||!reply.trim()} className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-600 text-white disabled:opacity-50"><Send size={15}/></button></form>
+    </>}
+   </section>
+  </div>
+ </div>
 }
 
 function TaskList({tasks,openTask,addTask,completeTask,deleteTask}:{tasks:Row[],openTask:(t:Row)=>void,addTask:()=>void,completeTask:(id:number,done:boolean)=>void,deleteTask:(id:number)=>void}){
