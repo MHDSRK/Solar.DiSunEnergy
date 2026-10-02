@@ -23,6 +23,7 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS lead_audit_log_lead_id_idx ON lead_audit_log (lead_id)`,
   `CREATE INDEX IF NOT EXISTS lead_followups_due_reminder_idx ON lead_followups (follow_up_at) WHERE status = 'PENDING' AND reminder_sent_at IS NULL`,
   `DROP INDEX IF EXISTS site_visits_slot_unique`,
+  `UPDATE site_visits sv SET status = 'CANCELLED' WHERE status = 'BOOKED' AND EXISTS (SELECT 1 FROM site_visits newer WHERE newer.status = 'BOOKED' AND newer.preferred_date = sv.preferred_date AND newer.preferred_time = sv.preferred_time AND newer.created_at > sv.created_at)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS site_visits_slot_unique ON site_visits (preferred_date, preferred_time) WHERE status = 'BOOKED'`,
   `DELETE FROM lead_audit_log WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_audit_log.lead_id)`,
   `DELETE FROM lead_followups WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_followups.lead_id)`,
