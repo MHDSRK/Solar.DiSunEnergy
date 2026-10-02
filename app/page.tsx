@@ -108,10 +108,10 @@ export default function Page() {
   }
 
   const calculateResult = () => calculateSolarResult(Number(form.bill), form.category, calculationMode)
-  const createLead = async () => {
+  const createLead = async (): Promise<{ success: boolean; leadId?: string; leadToken?: string }> => {
     if (leadCreationRef.current) return leadCreationRef.current
     const promise = (async () => {
-      if (isCreatingLead) return false
+      if (isCreatingLead) return { success: false }
       setIsCreatingLead(true)
       setLeadSaveError('')
       try {
@@ -121,7 +121,7 @@ export default function Page() {
         if (existingLeadId && existingLeadToken) {
           setLeadId(existingLeadId)
           setLeadToken(existingLeadToken)
-          return true
+          return { success: true, leadId: existingLeadId, leadToken: existingLeadToken }
         }
       }
 
@@ -137,7 +137,7 @@ export default function Page() {
         window.sessionStorage.setItem('disun_lead_id', data.leadId)
         window.sessionStorage.setItem('disun_lead_token', data.leadToken)
       }
-      return true
+      return { success: true, leadId: data.leadId, leadToken: data.leadToken }
     } catch (error) {
       console.error('Lead creation failed', error)
       setLeadId(null)
@@ -147,7 +147,7 @@ export default function Page() {
         window.sessionStorage.removeItem('disun_lead_token')
       }
       setLeadSaveError(error instanceof Error ? error.message : 'Unable to create your lead. Please try again.')
-      return false
+      return { success: false }
       } finally {
         setIsCreatingLead(false)
       }
@@ -161,13 +161,15 @@ export default function Page() {
   }
 
   const updateLead = async (updates: Record<string, unknown>) => {
-    if (!leadId || !leadToken) return false
+    const activeLeadId = leadId || (typeof window !== 'undefined' ? window.sessionStorage.getItem('disun_lead_id') : null)
+    const activeLeadToken = leadToken || (typeof window !== 'undefined' ? window.sessionStorage.getItem('disun_lead_token') : null)
+    if (!activeLeadId || !activeLeadToken) return false
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         const response = await fetch('/api/leads', {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ leadId, leadToken, ...updates }),
+          body: JSON.stringify({ leadId: activeLeadId, leadToken: activeLeadToken, ...updates }),
         })
         if (response.ok) {
           setLeadSaveError('')
@@ -187,7 +189,7 @@ export default function Page() {
     return false
   }
 
-  const validateAndSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const validateAndSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextErrors: Record<string, string> = {}
     if (!form.bill || !/^\d+$/.test(form.bill) || Number(form.bill) <= 0) nextErrors.bill = 'Enter a valid amount'
@@ -202,10 +204,22 @@ export default function Page() {
         setLeadSaveError('Please wait while we start your calculator.')
         return
       }
-      if (!leadId || !leadToken) {
-        setLeadSaveError('Your lead session could not be created. Please close this window and tap CALCULATE NOW again.')
-        return
+
+      // The website visit may already have created the lead. If it did not,
+      // CALCULATE is the fallback trigger that creates the lead before saving
+      // the calculator result.
+      let activeLeadId = leadId
+      let activeLeadToken = leadToken
+      if (!activeLeadId || !activeLeadToken) {
+        const created = await createLead()
+        if (!created.success || !created.leadId || !created.leadToken) {
+          setLeadSaveError('Your lead could not be created. Please try CALCULATE again.')
+          return
+        }
+        activeLeadId = created.leadId
+        activeLeadToken = created.leadToken
       }
+
       setResult(null)
       setIsCalculating(true)
       requestAnimationFrame(() => sheetRef.current?.scrollTo({ top: sheetRef.current.scrollHeight, behavior: 'smooth' }))
