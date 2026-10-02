@@ -64,17 +64,21 @@ export async function POST(request:Request){
 
 export async function DELETE(request:Request){
  try{
-  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json(); const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
+  const actor=await requireAdmin(); await ensureLeadTable(); const body=await request.json()
+  const ids=Array.isArray(body.leadIds)?body.leadIds.map(String).filter(Boolean):[]
   if(!ids.length) return NextResponse.json({success:false,message:'No leads selected.'},{status:400})
-  const rows=(await getSql()`SELECT lead_id FROM leads WHERE lead_id = ANY(${ids}::text[])`) as Record<string,any>[]
-  for(const row of rows) await auditEvent(String(row.lead_id),'record',`deleted by ${actor.name}`,actor)
-  await getSql().transaction(ids.flatMap((id: string) => [
-    getSql()`DELETE FROM lead_audit_log WHERE lead_id = ${id}`,
-    getSql()`DELETE FROM lead_followups WHERE lead_id = ${id}`,
-    getSql()`DELETE FROM lead_payments WHERE lead_id = ${id}`,
-    getSql()`DELETE FROM lead_project_stages WHERE lead_id = ${id}`,
-    getSql()`DELETE FROM leads WHERE lead_id = ${id}`,
+  const sql=getSql()
+  const rows=(await sql.query('SELECT lead_id FROM leads WHERE lead_id = ANY($1::text[])',[ids])) as Record<string,any>[]
+  await sql.transaction(ids.flatMap((id: string) => [
+    sql.query('DELETE FROM lead_audit_log WHERE lead_id=$1',[id]),
+    sql.query('DELETE FROM lead_followups WHERE lead_id=$1',[id]),
+    sql.query('DELETE FROM lead_payments WHERE lead_id=$1',[id]),
+    sql.query('DELETE FROM lead_project_stages WHERE lead_id=$1',[id]),
+    sql.query('DELETE FROM leads WHERE lead_id=$1',[id]),
   ]))
+  for(const row of rows){
+    await sql.query('INSERT INTO admin_audit_logs (action,lead_id,details,created_at) VALUES ($1,$2,$3::jsonb,NOW())',['lead_deleted',String(row.lead_id),JSON.stringify({deletedBy:actor.name,deletedByEmail:actor.email})])
+  }
   return NextResponse.json({success:true,deleted:rows.length})
  }catch(e){return NextResponse.json({success:false,message:unauthorized(e)?'Unauthorized':'Unable to delete leads.'},{status:unauthorized(e)?401:500})}
 }
