@@ -101,7 +101,7 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     whatsapp: { configured: false, sent: false },
   }
 
-  if (await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
+  if (event !== 'created' && await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
     try {
       results.googleSheet = await syncLeadToGoogleSheet(lead)
       if (results.googleSheet.saved) await completeNotification(eventKey, 'GOOGLE_SHEETS')
