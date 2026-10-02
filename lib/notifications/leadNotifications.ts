@@ -1,6 +1,6 @@
 import { ensureLeadTable, getSql } from '@/lib/db'
 import { syncLeadToGoogleSheet, appendSiteVisitToGoogleSheet } from '@/lib/notifications/googleSheets'
-import { sendWhatsAppLeadTemplate } from '@/lib/notifications/whatsapp'
+import { sendWhatsAppLeadNotification } from '@/lib/notifications/whatsapp'
 
 type LeadRecord = Record<string, unknown>
 
@@ -112,11 +112,11 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     }
   }
 
-  // WhatsApp is intentionally sent only once, after the first CALCULATE submission.
-  // CREATED happens before the form data exists; FEASIBILITY and later events must not send another WhatsApp.
+  // Automatic lead notifications go to the configured internal recipient, not the lead's phone.
+  // CREATED happens before the form data exists; CALCULATOR is the first event with complete lead details.
   if (event === 'calculator' && await claimNotification(eventKey, 'WHATSAPP')) {
     try {
-      results.whatsapp = await sendWhatsAppLeadTemplate(lead)
+      results.whatsapp = await sendWhatsAppLeadNotification(lead)
       if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
       else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
