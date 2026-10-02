@@ -5,7 +5,7 @@ import { fetchKsebRecap, resolveKsebSection } from '@/services/kseb/recapClient'
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { consumerNumber?: string; districtId?: string; district?: string; sectionId?: string; sectionOffice?: string; requestedKw?: number; transformerId?: string; transformerName?: string }
+    const body = await request.json() as { consumerNumber?: string; districtId?: string; district?: string; districtName?: string; sectionId?: string; sectionOffice?: string; requestedKw?: number; transformerId?: string; transformerName?: string }
     const requestedKw = Number(body.requestedKw)
     if (!Number.isFinite(requestedKw) || requestedKw <= 0) return NextResponse.json({ success: false, state: 'INVALID_REQUEST', message: 'Enter a valid requested solar capacity.' }, { status: 400 })
     const consumerNumber = body.consumerNumber?.trim() ?? ''
@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     const section = await resolveKsebSection({
       sectionId: body.sectionId,
       sectionOffice: body.sectionOffice || (decoded?.valid ? decoded.sectionName : undefined),
+      districtId: body.districtId,
+      districtName: body.districtName || body.district,
     })
     if (!section) return NextResponse.json({ success: false, state: 'SECTION_NOT_IDENTIFIED', message: 'Please select a KSEB Section Office or provide sufficient area information to identify the section.' }, { status: 422 })
     if (body.districtId && section.districtId && String(body.districtId) !== String(section.districtId)) return NextResponse.json({ success: false, state: 'DISTRICT_CONFLICT', message: 'Selected KSEB district and section do not match.' }, { status: 409 })
