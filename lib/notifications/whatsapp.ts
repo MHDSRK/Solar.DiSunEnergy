@@ -183,6 +183,89 @@ export async function sendWhatsAppLeadTemplate(lead: Record<string, unknown>): P
   return sendTemplate(lead)
 }
 
+export async function sendWhatsAppLeadNotification(lead: Record<string, unknown>): Promise<WhatsAppResult> {
+  const current = config()
+  if (!current) return { configured: false, sent: false }
+
+  const notificationPhone = normalizeWhatsAppPhone(process.env.WHATSAPP_LEAD_NOTIFICATION_PHONE?.trim() || '')
+  if (!notificationPhone || notificationPhone.length < 11) {
+    throw new Error('WHATSAPP_LEAD_NOTIFICATION_PHONE is required for automatic lead notifications.')
+  }
+
+  const templateName = process.env.WHATSAPP_LEAD_NOTIFICATION_TEMPLATE_NAME?.trim() || 'disun_lead_notification'
+  const templateLanguage = process.env.WHATSAPP_LEAD_NOTIFICATION_TEMPLATE_LANGUAGE?.trim() || 'en_US'
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: notificationPhone,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: templateLanguage },
+      components: [{
+        type: 'body',
+        parameters: [
+          { type: 'text', text: format(lead.lead_id) },
+          { type: 'text', text: format(lead.name) },
+          { type: 'text', text: format(lead.phone) },
+          { type: 'text', text: format(lead.district) },
+          { type: 'text', text: format(lead.area) },
+          { type: 'text', text: format(lead.bill) },
+          { type: 'text', text: format(lead.monthly_kwh) },
+          { type: 'text', text: format(lead.connection_category) },
+          { type: 'text', text: format(lead.recommended_kw) },
+        ],
+      }],
+    },
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/${current.version}/${current.phoneNumberId}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${current.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    },
+  )
+
+  const details = await response.text()
+  if (!response.ok) {
+    let apiCode: string | undefined
+    try {
+      const parsed = JSON.parse(details) as { error?: { code?: number | string } }
+      if (parsed.error?.code !== undefined) apiCode = String(parsed.error.code)
+    } catch {}
+    const error = new Error(`WhatsApp lead notification failed (${response.status}): ${details.slice(0, 1000)}`) as Error & { whatsappCode?: string }
+    error.whatsappCode = apiCode
+    throw error
+  }
+
+  let data: { messages?: Array<{ id?: string }> } = {}
+  try {
+    data = JSON.parse(details) as typeof data
+  } catch {}
+
+  const messageId = data.messages?.[0]?.id
+  if (!messageId) throw new Error('WhatsApp lead notification was accepted but returned no message ID.')
+
+  const conversation = await ensureWhatsAppConversation(notificationPhone, String(lead.lead_id || ''))
+  await storeWhatsAppOutboundMessage({
+    conversationId: conversation.conversationId,
+    messageId,
+    messageType: 'template',
+    body: null,
+    deliveryStatus: 'accepted',
+    rawPayload: { request: payload, response: data },
+  })
+
+  return { configured: true, sent: true, messageId, recipient: notificationPhone }
+}
+
 export async function sendWhatsAppTextMessage(
   lead: Record<string, unknown>,
   body: string,
