@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const cspHeader = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://hebbkx1anhila5yf.public.blob.vercel-storage.com",
   "font-src 'self' data:",
