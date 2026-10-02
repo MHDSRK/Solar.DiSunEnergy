@@ -187,12 +187,16 @@ export async function sendWhatsAppLeadNotification(lead: Record<string, unknown>
   const current = config()
   if (!current) return { configured: false, sent: false }
 
-  const notificationPhone = normalizeWhatsAppPhone(process.env.WHATSAPP_LEAD_NOTIFICATION_PHONE?.trim() || '')
+  const notificationPhone = normalizeWhatsAppPhone(
+    process.env.WHATSAPP_LEAD_NOTIFICATION_PHONE?.trim()
+      || process.env.WHATSAPP_RECIPIENT?.trim()
+      || '',
+  )
   if (!notificationPhone || notificationPhone.length < 11) {
     throw new Error('WHATSAPP_LEAD_NOTIFICATION_PHONE is required for automatic lead notifications.')
   }
 
-  const templateName = process.env.WHATSAPP_LEAD_NOTIFICATION_TEMPLATE_NAME?.trim() || 'disun_lead_notification'
+  const templateName = process.env.WHATSAPP_LEAD_NOTIFICATION_TEMPLATE_NAME?.trim() || 'disun_new_lead'
   const templateLanguage = process.env.WHATSAPP_LEAD_NOTIFICATION_TEMPLATE_LANGUAGE?.trim() || 'en_US'
 
   const payload = {
