@@ -148,9 +148,15 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
    const r=await fetch('/api/admin/whatsapp/conversations?page='+page+'&pageSize=30',{cache:'no-store',credentials:'same-origin'})
    const d=await r.json().catch(()=>({}))
    if(!r.ok) throw new Error(d.message||'Unable to load WhatsApp conversations.')
-   setConversations(current=>append?[...current,...(d.conversations||[])]:d.conversations||[])
-   setConversationPage(page)
-   setConversationHasMore(Boolean(d.hasMore))
+   setConversations(current=>{
+    const incoming=d.conversations||[]
+    const map=new Map<string,Row>()
+    for(const item of current) map.set(String(item.conversation_id),item)
+    for(const item of incoming) map.set(String(item.conversation_id),item)
+    return [...map.values()].sort((a,b)=>new Date(b.last_message_at||0).getTime()-new Date(a.last_message_at||0).getTime())
+   })
+   setConversationPage(current=>append?Math.max(current,page):Math.max(current,page))
+   setConversationHasMore(Boolean(d.hasMore) || (Number(d.total||0)>30))
   }catch(e){setError(e instanceof Error?e.message:'Unable to load WhatsApp conversations.')}
   finally{setLoading(false)}
  }
