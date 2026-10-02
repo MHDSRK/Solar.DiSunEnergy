@@ -155,6 +155,11 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
  }
  useEffect(()=>{void loadConversations();const timer=window.setInterval(()=>void loadConversations(),5000);return()=>window.clearInterval(timer)},[])
  const active=conversations.find(x=>Number(x.conversation_id)===activeId)
+ useEffect(()=>{
+  if(!activeId) return
+  const timer=window.setInterval(()=>void loadMessages(activeId),3000)
+  return()=>window.clearInterval(timer)
+ },[activeId])
  const sendReply=async()=>{
   const text=reply.trim()
   if(!activeId||!text||sending)return
@@ -180,10 +185,13 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
    <section className="flex min-h-[620px] flex-col">
     {!active?<div className="grid flex-1 place-items-center p-8 text-center"><div><MessageCircle className="mx-auto mb-2 text-slate-300" size={32}/><p className="text-sm font-bold text-slate-500">Select a conversation</p><p className="mt-1 text-xs text-slate-400">Incoming WhatsApp replies will appear here.</p></div></div>:<>
       <div className="border-b px-4 py-3"><div className="text-sm font-black">{active.display_name||active.profile_name||active.phone}</div><div className="text-[10px] text-slate-400">{active.phone}{active.lead_id?' · Lead '+active.lead_id:''}</div></div>
-      <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50 p-4">{messages.map(m=><div key={m.whatsapp_message_id} className={m.direction==='OUTBOUND'?'flex justify-end':'flex justify-start'}><div className={m.direction==='OUTBOUND'?'max-w-[80%] rounded-2xl px-3 py-2 shadow-sm bg-sky-600 text-white':'max-w-[80%] rounded-2xl px-3 py-2 shadow-sm bg-white text-slate-800'}>
-        <div className="whitespace-pre-wrap text-xs">{m.body||m.caption||m.message_type}</div>
-        <div className={m.direction==='OUTBOUND'?'mt-1 text-[9px] text-sky-100':'mt-1 text-[9px] text-slate-400'}>{dt(m.sent_at)}{m.direction==='OUTBOUND'?' · '+String(m.delivery_status||'accepted'):''}</div>
-      </div></div>)}</div>
+      <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">{messages.map(m=>{const outbound=String(m.direction||'').toUpperCase()==='OUTBOUND';return <div key={m.whatsapp_message_id} className={`flex w-full ${outbound?'justify-end':'justify-start'}`}>
+        <div className={`max-w-[78%] rounded-2xl px-3 py-2 shadow-sm ${outbound?'bg-sky-600 text-white rounded-br-md':'bg-white text-slate-800 rounded-bl-md border border-slate-200'}`}>
+          <div className="mb-0.5 text-[9px] font-bold opacity-60">{outbound?'You':'Customer'}</div>
+          <div className="whitespace-pre-wrap break-words text-xs">{m.body||m.caption||m.message_type}</div>
+          <div className={outbound?'mt-1 text-[9px] text-sky-100':'mt-1 text-[9px] text-slate-400'}>{dt(m.sent_at)}{outbound?' · '+String(m.delivery_status||'accepted'):''}</div>
+        </div>
+      </div>})}</div>
       {error&&<div className="border-t bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
       <form onSubmit={e=>{e.preventDefault();void sendReply()}} className="flex gap-2 border-t bg-white p-3"><input value={reply} onChange={e=>setReply(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-sky-500"/><button disabled={sending||!reply.trim()} className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-600 text-white disabled:opacity-50"><Send size={15}/></button></form>
     </>}
