@@ -46,10 +46,6 @@ export default function Page() {
   const [result, setResult] = useState<{ kw: number; roofMin: number; roofMax: number; cost: number; subsidy: number; loan: number; netCost: number; monthlyKwh: number; loanAssumption?: { estimatedEmi: number } } | null>(null)
   const leadCreationRef = useRef<Promise<boolean> | null>(null)
   useEffect(() => {
-    void createLead()
-  }, [])
-
-  useEffect(() => {
     if (!result) return
     requestAnimationFrame(() => {
       const sheet = sheetRef.current
