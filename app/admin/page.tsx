@@ -136,32 +136,52 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
  const [loading,setLoading]=useState(true)
  const [sending,setSending]=useState(false)
  const [error,setError]=useState('')
+ const [conversationPage,setConversationPage]=useState(1)
+ const [conversationHasMore,setConversationHasMore]=useState(false)
+ const [messageHasMore,setMessageHasMore]=useState(false)
+ const [messageBefore,setMessageBefore]=useState<string|null>(null)
+ const [loadingOlder,setLoadingOlder]=useState(false)
 
- const loadConversations=async()=>{
+ const loadConversations=async(append=false)=>{
   try{
-   const r=await fetch('/api/admin/whatsapp/conversations',{cache:'no-store',credentials:'same-origin'})
+   const page=append?conversationPage+1:1
+   const r=await fetch('/api/admin/whatsapp/conversations?page='+page+'&pageSize=30',{cache:'no-store',credentials:'same-origin'})
    const d=await r.json().catch(()=>({}))
    if(!r.ok) throw new Error(d.message||'Unable to load WhatsApp conversations.')
-   setConversations(d.conversations||[])
+   setConversations(current=>append?[...current,...(d.conversations||[])]:d.conversations||[])
+   setConversationPage(page)
+   setConversationHasMore(Boolean(d.hasMore))
   }catch(e){setError(e instanceof Error?e.message:'Unable to load WhatsApp conversations.')}
   finally{setLoading(false)}
  }
- const loadMessages=async(id:number)=>{
-  setActiveId(id);setError('')
+
+ const loadMessages=async(id:number,before:string|null=null,older=false)=>{
+  if(older)setLoadingOlder(true)
+  else setActiveId(id)
+  setError('')
   try{
-   const r=await fetch('/api/admin/whatsapp/conversations/messages?conversationId='+id,{cache:'no-store',credentials:'same-origin'})
+   const query='/api/admin/whatsapp/conversations/messages?conversationId='+id+'&limit=50'+(before?'&before='+encodeURIComponent(before):'')
+   const r=await fetch(query,{cache:'no-store',credentials:'same-origin'})
    const d=await r.json().catch(()=>({}))
    if(!r.ok) throw new Error(d.message||'Unable to load conversation.')
-   setMessages(d.messages||[]);await loadConversations()
+   const incoming=d.messages||[]
+   if(older)setMessages(current=>[...incoming,...current.filter((m)=>!incoming.some((x:any)=>x.whatsapp_message_id===m.whatsapp_message_id))])
+   else setMessages(current=>{const map=new Map<string,Row>();for(const m of current)map.set(String(m.whatsapp_message_id),m);for(const m of incoming)map.set(String(m.whatsapp_message_id),m);return [...map.values()].sort((a,b)=>new Date(a.created_at||a.sent_at).getTime()-new Date(b.created_at||b.sent_at).getTime())})
+   setMessageHasMore(Boolean(d.hasMore))
+   setMessageBefore(d.nextBefore||null)
+   if(!older) setConversationHasMore((current)=>current)
   }catch(e){setError(e instanceof Error?e.message:'Unable to load conversation.')}
+  finally{setLoadingOlder(false)}
  }
- useEffect(()=>{void loadConversations();const timer=window.setInterval(()=>void loadConversations(),5000);return()=>window.clearInterval(timer)},[])
- const active=conversations.find(x=>Number(x.conversation_id)===activeId)
+
+ useEffect(()=>{void loadConversations();const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void loadConversations()},15000);return()=>window.clearInterval(timer)},[])
  useEffect(()=>{
-  if(!activeId) return
-  const timer=window.setInterval(()=>void loadMessages(activeId),3000)
+  if(!activeId)return
+  const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void loadMessages(activeId)},8000)
   return()=>window.clearInterval(timer)
  },[activeId])
+
+ const active=conversations.find(x=>Number(x.conversation_id)===activeId)
  const sendReply=async()=>{
   const text=reply.trim()
   if(!activeId||!text||sending)return
@@ -175,25 +195,29 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
   }catch(e){setError(e instanceof Error?e.message:'Unable to send reply.')}
   finally{setSending(false)}
  }
+
  return <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
   <div className="grid min-h-[620px] md:grid-cols-[300px_minmax(0,1fr)]">
    <aside className="border-b border-slate-200 md:border-b-0 md:border-r">
     <div className="flex items-center justify-between border-b px-4 py-3"><div><h2 className="text-sm font-black">WhatsApp Inbox</h2><p className="text-[10px] text-slate-400">Incoming and outgoing messages</p></div><button onClick={()=>{setLoading(true);void loadConversations()}} className="rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700">Refresh</button></div>
-    {loading?<div className="p-5 text-xs text-slate-400">Loading conversations…</div>:conversations.length===0?<div className="p-5 text-xs text-slate-400">No WhatsApp conversations yet.</div>:<div className="max-h-[520px] overflow-y-auto">{conversations.map(x=>{const id=Number(x.conversation_id);const selected=id===activeId;const name=String(x.display_name||x.profile_name||x.phone||'Unknown');const preview=String(x.last_body||x.last_message_type||'Message');return <button key={id} onClick={()=>void loadMessages(id)} className={selected?'w-full border-b px-4 py-3 text-left bg-sky-50':'w-full border-b px-4 py-3 text-left bg-white hover:bg-slate-50'}>
+    {loading?<div className="p-5 text-xs text-slate-400">Loading conversations…</div>:conversations.length===0?<div className="p-5 text-xs text-slate-400">No WhatsApp conversations yet.</div>:<div className="max-h-[520px] overflow-y-auto">{conversations.map(x=>{const id=Number(x.conversation_id);const selected=id===activeId;const name=String(x.display_name||x.profile_name||x.phone||'Unknown');const preview=String(x.last_body||x.last_message_type||'Message');return <button key={id} onClick={()=>{setMessages([]);setMessageBefore(null);setMessageHasMore(false);void loadMessages(id)}} className={selected?'w-full border-b px-4 py-3 text-left bg-sky-50':'w-full border-b px-4 py-3 text-left bg-white hover:bg-slate-50'}>
       <div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-bold text-slate-800">{name}</span>{Number(x.unread_count||0)>0&&<span className="grid min-w-5 place-items-center rounded-full bg-sky-600 px-1.5 py-0.5 text-[9px] font-black text-white">{x.unread_count}</span>}</div>
       <div className="mt-0.5 truncate text-[10px] text-slate-500">{x.phone}</div><div className="mt-1 truncate text-[10px] text-slate-400">{preview}</div><div className="mt-1 text-[9px] text-slate-300">{dt(x.last_message_at)}</div>
-    </button>})}</div>}
+    </button>})}{conversationHasMore&&<button onClick={()=>void loadConversations(true)} className="w-full border-t px-4 py-3 text-[10px] font-bold text-sky-700">LOAD MORE CONVERSATIONS</button>}</div>}
    </aside>
    <section className="flex min-h-[620px] flex-col">
     {!active?<div className="grid flex-1 place-items-center p-8 text-center"><div><MessageCircle className="mx-auto mb-2 text-slate-300" size={32}/><p className="text-sm font-bold text-slate-500">Select a conversation</p><p className="mt-1 text-xs text-slate-400">Incoming WhatsApp replies will appear here.</p></div></div>:<>
       <div className="border-b px-4 py-3"><div className="text-sm font-black">{active.display_name||active.profile_name||active.phone}</div><div className="text-[10px] text-slate-400">{active.phone}{active.lead_id?' · Lead '+active.lead_id:''}</div></div>
-      <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">{messages.map(m=>{const outbound=String(m.direction||'').toUpperCase()==='OUTBOUND';return <div key={m.whatsapp_message_id} className={`flex w-full ${outbound?'justify-end':'justify-start'}`}>
+      <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
+       {messageHasMore&&<button disabled={loadingOlder} onClick={()=>messageBefore&&void loadMessages(activeId,messageBefore,true)} className="mx-auto block rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-sky-700 shadow-sm disabled:opacity-50">{loadingOlder?'LOADING…':'LOAD OLDER MESSAGES'}</button>}
+       {messages.map(m=>{const outbound=String(m.direction||'').toUpperCase()==='OUTBOUND';return <div key={m.whatsapp_message_id} className={`flex w-full ${outbound?'justify-end':'justify-start'}`}>
         <div className={`max-w-[78%] rounded-2xl px-3 py-2 shadow-sm ${outbound?'bg-sky-600 text-white rounded-br-md':'bg-white text-slate-800 rounded-bl-md border border-slate-200'}`}>
           <div className="mb-0.5 text-[9px] font-bold opacity-60">{outbound?'You':'Customer'}</div>
           <div className="whitespace-pre-wrap break-words text-xs">{m.body||m.caption||m.message_type}</div>
           <div className={outbound?'mt-1 text-[9px] text-sky-100':'mt-1 text-[9px] text-slate-400'}>{dt(m.sent_at)}{outbound?' · '+String(m.delivery_status||'accepted'):''}</div>
         </div>
-      </div>})}</div>
+       </div>})}
+      </div>
       {error&&<div className="border-t bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
       <form onSubmit={e=>{e.preventDefault();void sendReply()}} className="flex gap-2 border-t bg-white p-3"><input value={reply} onChange={e=>setReply(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-sky-500"/><button disabled={sending||!reply.trim()} className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-600 text-white disabled:opacity-50"><Send size={15}/></button></form>
     </>}
