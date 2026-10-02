@@ -105,6 +105,7 @@ async function ensureWhatsAppSchema() {
     await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb`
     await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
     await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+    await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS status_at TIMESTAMPTZ`
     await sql`CREATE INDEX IF NOT EXISTS whatsapp_messages_conversation_idx ON whatsapp_messages (conversation_id, sent_at DESC)`
     await sql`CREATE INDEX IF NOT EXISTS whatsapp_messages_status_idx ON whatsapp_messages (delivery_status)`
     await sql`CREATE INDEX IF NOT EXISTS whatsapp_contacts_lead_idx ON whatsapp_contacts (lead_id)`
@@ -275,18 +276,29 @@ export function parseWhatsAppStatuses(body: any) {
 export async function updateWhatsAppStatus(status: { messageId: string; status: string; timestamp: string | null; recipient: string | null; raw: unknown }) {
   await ensureWhatsAppSchema()
   const sql = await getDb()
+  const normalizedStatus = String(status.status || 'unknown').toLowerCase()
+  const timestamp = status.timestamp ? Number(status.timestamp) : NaN
+  const hasTimestamp = Number.isFinite(timestamp) && timestamp > 0
+  const statusAt = hasTimestamp ? new Date(timestamp * 1000) : null
+
   const rows = await sql.query(
     `UPDATE whatsapp_messages
      SET delivery_status = $1,
-         sent_at = CASE WHEN $1 = 'sent' THEN COALESCE(sent_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE sent_at END,
-         delivered_at = CASE WHEN $1 = 'delivered' THEN COALESCE(delivered_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE delivered_at END,
-         read_at = CASE WHEN $1 = 'read' THEN COALESCE(read_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE read_at END,
-         failed_at = CASE WHEN $1 = 'failed' THEN COALESCE(failed_at, COALESCE(TO_TIMESTAMP($2::double precision), NOW())) ELSE failed_at END,
+         status_at = COALESCE($2::timestamptz, status_at),
+         sent_at = CASE WHEN $1 = 'sent' THEN COALESCE(sent_at, COALESCE($2::timestamptz, NOW())) ELSE sent_at END,
+         delivered_at = CASE WHEN $1 = 'delivered' THEN COALESCE(delivered_at, COALESCE($2::timestamptz, NOW())) ELSE delivered_at END,
+         read_at = CASE WHEN $1 = 'read' THEN COALESCE(read_at, COALESCE($2::timestamptz, NOW())) ELSE read_at END,
+         failed_at = CASE WHEN $1 = 'failed' THEN COALESCE(failed_at, COALESCE($2::timestamptz, NOW())) ELSE failed_at END,
          error_payload = CASE WHEN $1 = 'failed' THEN $3::jsonb ELSE error_payload END,
          updated_at = NOW()
      WHERE whatsapp_message_id = $4
-     RETURNING id`,
-    [status.status, status.timestamp || '0', JSON.stringify(status.raw), status.messageId],
+       AND (
+         status_at IS NULL
+         OR $2::timestamptz IS NULL
+         OR $2::timestamptz >= status_at
+       )
+     RETURNING id, delivery_status, status_at`,
+    [normalizedStatus, statusAt, JSON.stringify(status.raw), status.messageId],
   )
   const updated = (rows as any[]).length > 0
   if (!updated && status.recipient) {
@@ -296,7 +308,7 @@ export async function updateWhatsAppStatus(status: { messageId: string; status: 
         conversationId: conversation.conversationId,
         messageId: status.messageId,
         messageType: 'unknown',
-        deliveryStatus: status.status,
+        deliveryStatus: normalizedStatus,
         rawPayload: status.raw,
       })
       return true
@@ -305,10 +317,11 @@ export async function updateWhatsAppStatus(status: { messageId: string; status: 
     }
   }
   if (!updated) {
-    console.warn('WhatsApp status received for unknown outbound message', {
+    console.warn('WhatsApp status ignored because it is older than the stored status or the message is unknown', {
       messageId: status.messageId,
-      status: status.status,
+      status: normalizedStatus,
       recipient: status.recipient,
+      timestamp: status.timestamp,
     })
   }
   return updated
