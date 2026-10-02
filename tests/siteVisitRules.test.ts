@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { validateSiteVisitSlot } from '../lib/siteVisitRules'
+import { validateSiteVisitSlot } from '../lib/siteVisitRules.ts'
 
 test('rejects a site-visit time that has already passed today in India', () => {
   const now = new Date('2026-10-02T05:30:00.000Z') // 11:00 IST
