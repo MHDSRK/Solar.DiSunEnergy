@@ -11,23 +11,7 @@ function format(value: unknown) {
 let notificationSchemaPromise: Promise<void> | null = null
 
 async function ensureNotificationSchema() {
-  if (notificationSchemaPromise) return notificationSchemaPromise
-  notificationSchemaPromise = (async () => {
-    await ensureLeadTable()
-    await getSql()`CREATE TABLE IF NOT EXISTS notification_events (
-      event_key TEXT NOT NULL,
-      channel TEXT NOT NULL,
-      status TEXT NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (event_key, channel)
-    )`
-  })().catch((error) => {
-    notificationSchemaPromise = null
-    throw error
-  })
-  return notificationSchemaPromise
+  return
 }
 
 async function claimNotification(eventKey: string, channel: string) {
