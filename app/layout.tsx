@@ -4,7 +4,23 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'DiSun — Solar Power Calculator',
-  description: 'DiSun Energy International solar power calculator and transformer feasibility tool.'
+  description: 'DiSun Energy International solar power calculator and transformer feasibility tool.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon',
+  },
+  openGraph: {
+    title: 'DiSun — Solar Power Calculator',
+    description: 'DiSun Energy International solar power calculator and transformer feasibility tool.',
+    images: ['/opengraph-image'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'DiSun — Solar Power Calculator',
+    description: 'DiSun Energy International solar power calculator and transformer feasibility tool.',
+    images: ['/twitter-image'],
+  },
 }
 
 export const viewport: Viewport = {
@@ -29,4 +45,3 @@ export default function RootLayout({
     </html>
   )
 }
-
