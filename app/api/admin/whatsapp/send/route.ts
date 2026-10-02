@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { getSql, ensureLeadTable } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
 import {
+  claimManualWhatsAppSend,
+  completeManualWhatsAppSend,
+  failManualWhatsAppSend,
   sendWhatsAppLeadTemplate,
   sendWhatsAppPdf,
   sendWhatsAppTextMessage,
@@ -79,34 +82,74 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'This lead does not have a phone number.' }, { status: 400 })
     }
 
-    if (mode === 'text') {
-      const result = await sendWhatsAppTextMessage(lead, bodyText)
-      if (!result.sent) {
-        return NextResponse.json({ success: false, configured: result.configured, message: 'WhatsApp integration is not configured.' }, { status: 503 })
-      }
-      return NextResponse.json({ success: true, mode, messageId: result.messageId, recipient: result.recipient })
+    const idempotencyKey = String(request.headers.get('x-whatsapp-idempotency-key') || '').trim()
+    if (!idempotencyKey || idempotencyKey.length > 200) {
+      return NextResponse.json({ success: false, message: 'A WhatsApp send request key is required.' }, { status: 400 })
     }
 
-    if (mode === 'document') {
-      if (!file) return NextResponse.json({ success: false, message: 'Please select a PDF file.' }, { status: 400 })
-      if (file.type !== 'application/pdf') return NextResponse.json({ success: false, message: 'Only PDF files can be sent.' }, { status: 400 })
-      if (file.size > 4 * 1024 * 1024) return NextResponse.json({ success: false, message: 'PDF is too large. Please use a PDF under 4 MB.' }, { status: 413 })
-      const result = await sendWhatsAppPdf(lead, file, caption)
-      if (!result.sent) {
-        return NextResponse.json({ success: false, configured: result.configured, message: 'WhatsApp integration is not configured.' }, { status: 503 })
-      }
-      return NextResponse.json({ success: true, mode, messageId: result.messageId, recipient: result.recipient })
+    if (!(await claimManualWhatsAppSend(idempotencyKey))) {
+      return NextResponse.json({
+        success: false,
+        duplicate: true,
+        message: 'This WhatsApp send request has already been processed or is already in progress.',
+      }, { status: 409 })
     }
 
-    if (mode === 'template') {
-      const result = await sendWhatsAppLeadTemplate(lead)
-      if (!result.sent) {
-        return NextResponse.json({ success: false, configured: result.configured, message: 'WhatsApp integration is not configured.' }, { status: 503 })
+    try {
+        if (mode === 'text') {
+        const result = await sendWhatsAppTextMessage(lead, bodyText)
+        if (!result.sent) {
+          await failManualWhatsAppSend(idempotencyKey, 'WhatsApp integration is not configured.')
+          return NextResponse.json({ success: false, configured: result.configured, message: 'WhatsApp integration is not configured.' }, { status: 503 })
+        }
+        await completeManualWhatsAppSend(idempotencyKey)
+        return NextResponse.json({ success: true, mode, messageId: result.messageId, recipient: result.recipient })
       }
-      return NextResponse.json({ success: true, mode, messageId: result.messageId, recipient: result.recipient })
-    }
 
-    return NextResponse.json({ success: false, message: 'Unsupported WhatsApp send mode.' }, { status: 400 })
+      if (mode === 'document') {
+        if (!file) {
+          await failManualWhatsAppSend(idempotencyKey, 'PDF file is required.')
+          return NextResponse.json({ success: false, message: 'Please select a PDF file.' }, { status: 400 })
+        }
+        if (file.type !== 'application/pdf') {
+          await failManualWhatsAppSend(idempotencyKey, 'Only PDF files can be sent.')
+          return NextResponse.json({ success: false, message: 'Only PDF files can be sent.' }, { status: 400 })
+        }
+        if (file.size > 4 * 1024 * 1024) {
+          await failManualWhatsAppSend(idempotencyKey, 'PDF is too large.')
+          return NextResponse.json({ success: false, message: 'PDF is too large. Please use a PDF under 4 MB.' }, { status: 413 })
+        }
+        const result = await sendWhatsAppPdf(lead, file, caption)
+        if (!result.sent) {
+          await failManualWhatsAppSend(idempotencyKey, 'WhatsApp integration is not configured.')
+          return NextResponse.json({ success: false, configured: result.configured, message: 'WhatsApp integration is not configured.' }, { status: 503 })
+        }
+        await completeManualWhatsAppSend(idempotencyKey)
+        return NextResponse.json({ success: true, mode, messageId: result.messageId, recipient: result.recipient })
+      }
+
+      if (mode === 'template') {
+        const result = await sendWhatsAppLeadTemplate(lead)
+        if (!result.sent) {
+          await failManualWhatsAppSend(idempotencyKey, 'WhatsApp integration is not configured.')
+          return NextResponse.json({ success: false, configured: result.configured, message: 'WhatsApp integration is not configured.' }, { status: 503 })
+        }
+        await completeManualWhatsAppSend(idempotencyKey)
+        return NextResponse.json({ success: true, mode, messageId: result.messageId, recipient: result.recipient })
+      }
+
+      await failManualWhatsAppSend(idempotencyKey, 'Unsupported WhatsApp send mode.')
+      return NextResponse.json({ success: false, message: 'Unsupported WhatsApp send mode.' }, { status: 400 })
+    } catch (error) {
+      // If the Meta request or the local outbound-record write fails ambiguously,
+      // keep the idempotency record PROCESSING. A retry with the same key must not
+      // send another message when the first request may already have reached Meta.
+      const whatsappCode = error && typeof error === 'object' && 'whatsappCode' in error
+        ? String((error as { whatsappCode?: unknown }).whatsappCode || '')
+        : ''
+      if (whatsappCode) await failManualWhatsAppSend(idempotencyKey, error)
+      throw error
+    }
   } catch (error) {
     return errorResponse(error)
   }
