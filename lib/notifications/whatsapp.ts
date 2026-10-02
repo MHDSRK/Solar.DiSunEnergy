@@ -42,15 +42,58 @@ function formatFollowupDateTime(value: unknown) {
     date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
-function buildTemplateComponents(imageUrl: string | undefined) {
-  if (!imageUrl) {
-    throw new Error('WHATSAPP_TEMPLATE_IMAGE_URL is required for the approved image-header template.')
+async function uploadTemplateImage(
+  current: ReturnType<typeof config>,
+  imageUrl: string,
+) {
+  if (!current) throw new Error('WhatsApp is not configured.')
+
+  let imageResponse: Response
+  try {
+    imageResponse = await fetch(imageUrl, { cache: 'no-store' })
+  } catch (error) {
+    throw new Error('Unable to fetch WHATSAPP_TEMPLATE_IMAGE_URL before sending the template: ' + (error instanceof Error ? error.message : String(error)))
+  }
+  if (!imageResponse.ok) {
+    throw new Error('WHATSAPP_TEMPLATE_IMAGE_URL returned HTTP ' + imageResponse.status + '. Use a stable public HTTPS image URL.')
   }
 
-  return [{
-    type: 'header',
-    parameters: [{ type: 'image', image: { link: imageUrl } }],
-  }]
+  const contentType = imageResponse.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png'
+  if (!contentType.startsWith('image/')) {
+    throw new Error('WHATSAPP_TEMPLATE_IMAGE_URL did not return an image (Content-Type: ' + contentType + ').')
+  }
+
+  const bytes = await imageResponse.arrayBuffer()
+  if (!bytes.byteLength) throw new Error('WHATSAPP_TEMPLATE_IMAGE_URL returned an empty image.')
+
+  const form = new FormData()
+  form.append('messaging_product', 'whatsapp')
+  form.append('file', new Blob([bytes], { type: contentType }), 'disun-template-header.' + (contentType.split('/')[1] || 'png'))
+
+  const response = await fetch(
+    'https://graph.facebook.com/' + current.version + '/' + current.phoneNumberId + '/media',
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + current.accessToken },
+      body: form,
+      cache: 'no-store',
+    },
+  )
+  const details = await response.text()
+  if (!response.ok) {
+    let apiCode: string | undefined
+    try {
+      const parsed = JSON.parse(details) as { error?: { code?: number | string } }
+      if (parsed.error?.code !== undefined) apiCode = String(parsed.error.code)
+    } catch {}
+    const error = new Error('WhatsApp template image upload failed (' + response.status + '): ' + details.slice(0, 1000)) as Error & { whatsappCode?: string }
+    error.whatsappCode = apiCode
+    throw error
+  }
+
+  const data = JSON.parse(details) as { id?: string }
+  if (!data.id) throw new Error('WhatsApp template image upload succeeded but returned no media ID.')
+  return data.id
 }
 
 async function sendTemplate(
@@ -69,7 +112,15 @@ async function sendTemplate(
   const templateLanguage = options?.templateLanguage || current.templateLanguage
   const imageUrl = options?.imageUrl || current.imageUrl
 
-  const components = buildTemplateComponents(imageUrl)
+  if (!imageUrl) {
+    throw new Error('WHATSAPP_TEMPLATE_IMAGE_URL is required for the approved image-header template.')
+  }
+
+  const imageMediaId = await uploadTemplateImage(current, imageUrl)
+  const components = [{
+    type: 'header',
+    parameters: [{ type: 'image', image: { id: imageMediaId } }],
+  }]
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
