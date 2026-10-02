@@ -1,4 +1,4 @@
-import { normalizeTransformer, type TransformerRecord } from './feasibilityEngine'
+import { normalizeTransformer, type TransformerRecord } from './feasibilityEngine.ts'
 
 const BASE = 'https://wss.kseb.in/selfservices/'
 let lastSuccessfulFetch: string | null = null
