@@ -70,11 +70,11 @@ export async function DELETE(request:Request){
   const sql=getSql()
   const rows=(await sql.query('SELECT lead_id FROM leads WHERE lead_id = ANY($1::text[])',[ids])) as Record<string,any>[]
   await sql.transaction(ids.flatMap((id: string) => [
-    sql.query('DELETE FROM lead_audit_log WHERE lead_id=$1',[id]),
-    sql.query('DELETE FROM lead_followups WHERE lead_id=$1',[id]),
-    sql.query('DELETE FROM lead_payments WHERE lead_id=$1',[id]),
-    sql.query('DELETE FROM lead_project_stages WHERE lead_id=$1',[id]),
-    sql.query('DELETE FROM leads WHERE lead_id=$1',[id]),
+    sql.unsafe('DELETE FROM lead_audit_log WHERE lead_id=$1',[id]),
+    sql.unsafe('DELETE FROM lead_followups WHERE lead_id=$1',[id]),
+    sql.unsafe('DELETE FROM lead_payments WHERE lead_id=$1',[id]),
+    sql.unsafe('DELETE FROM lead_project_stages WHERE lead_id=$1',[id]),
+    sql.unsafe('DELETE FROM leads WHERE lead_id=$1',[id]),
   ]))
   for(const row of rows){
     await sql.query('INSERT INTO admin_audit_logs (action,lead_id,details,created_at) VALUES ($1,$2,$3::jsonb,NOW())',['lead_deleted',String(row.lead_id),JSON.stringify({deletedBy:actor.name,deletedByEmail:actor.email})])
