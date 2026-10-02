@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
 import { requireAdmin } from '@/lib/adminAuth'
-import { ensureWhatsAppSchema } from '@/lib/whatsapp'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -9,7 +8,6 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     await requireAdmin()
-    await ensureWhatsAppSchema()
     const rows = await getSql().query(
       `SELECT
          c.id AS conversation_id,
