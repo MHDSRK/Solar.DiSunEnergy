@@ -29,10 +29,10 @@ const migrations = [
   `DELETE FROM lead_followups WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_followups.lead_id)`,
   `DELETE FROM lead_payments WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_payments.lead_id)`,
   `DELETE FROM lead_project_stages WHERE NOT EXISTS (SELECT 1 FROM leads WHERE leads.lead_id = lead_project_stages.lead_id)`,
-  `DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lead_audit_log_lead_fk') THEN ALTER TABLE lead_audit_log ADD CONSTRAINT lead_audit_log_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE; END IF; END $`,
-  `DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lead_followups_lead_fk') THEN ALTER TABLE lead_followups ADD CONSTRAINT lead_followups_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE; END IF; END $`,
-  `DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lead_payments_lead_fk') THEN ALTER TABLE lead_payments ADD CONSTRAINT lead_payments_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE; END IF; END $`,
-  `DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lead_project_stages_lead_fk') THEN ALTER TABLE lead_project_stages ADD CONSTRAINT lead_project_stages_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE; END IF; END $`,
+  `ALTER TABLE lead_audit_log ADD CONSTRAINT lead_audit_log_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
+  `ALTER TABLE lead_followups ADD CONSTRAINT lead_followups_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
+  `ALTER TABLE lead_payments ADD CONSTRAINT lead_payments_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
+  `ALTER TABLE lead_project_stages ADD CONSTRAINT lead_project_stages_lead_fk FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE`,
   `CREATE INDEX IF NOT EXISTS leads_status_idx ON leads (lead_status)`,
   `CREATE INDEX IF NOT EXISTS leads_updated_idx ON leads (updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS lead_events_lead_idx ON lead_events (lead_id, created_at DESC)`,
@@ -51,7 +51,14 @@ const migrations = [
 
 ]
 
-for (const statement of migrations) await sql.unsafe(statement)
+for (const statement of migrations) {
+  try {
+    await sql.unsafe(statement)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!/already exists|duplicate_object/i.test(message)) throw error
+  }
+}
 
 const requiredTables = [
   'leads',
