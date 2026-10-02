@@ -5,7 +5,6 @@ import './globals.css'
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://solardisunenergy.vercel.app'
 
 export const metadata: Metadata = {
-export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
 
   title: 'DiSun Energy International | Solar Power Calculator',
@@ -44,8 +43,6 @@ export const metadata: Metadata = {
     description:
       'Solar power calculator and KSEB transformer feasibility for Kerala customers.',
     images: ['/twitter-image'],
-  },
-}
   },
 }
 
