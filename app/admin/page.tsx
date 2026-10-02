@@ -169,7 +169,6 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
    else setMessages(current=>{const map=new Map<string,Row>();for(const m of current)map.set(String(m.whatsapp_message_id),m);for(const m of incoming)map.set(String(m.whatsapp_message_id),m);return [...map.values()].sort((a,b)=>new Date(a.created_at||a.sent_at).getTime()-new Date(b.created_at||b.sent_at).getTime())})
    setMessageHasMore(Boolean(d.hasMore))
    setMessageBefore(d.nextBefore||null)
-   if(!older) setConversationHasMore((current)=>current)
   }catch(e){setError(e instanceof Error?e.message:'Unable to load conversation.')}
   finally{setLoadingOlder(false)}
  }
@@ -209,7 +208,7 @@ function WhatsAppInbox({ onNotice }: { onNotice: (value: string) => void }) {
     {!active?<div className="grid flex-1 place-items-center p-8 text-center"><div><MessageCircle className="mx-auto mb-2 text-slate-300" size={32}/><p className="text-sm font-bold text-slate-500">Select a conversation</p><p className="mt-1 text-xs text-slate-400">Incoming WhatsApp replies will appear here.</p></div></div>:<>
       <div className="border-b px-4 py-3"><div className="text-sm font-black">{active.display_name||active.profile_name||active.phone}</div><div className="text-[10px] text-slate-400">{active.phone}{active.lead_id?' · Lead '+active.lead_id:''}</div></div>
       <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
-       {messageHasMore&&<button disabled={loadingOlder} onClick={()=>messageBefore&&void loadMessages(activeId,messageBefore,true)} className="mx-auto block rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-sky-700 shadow-sm disabled:opacity-50">{loadingOlder?'LOADING…':'LOAD OLDER MESSAGES'}</button>}
+       {messageHasMore&&<button disabled={loadingOlder} onClick={()=>messageBefore&&void loadMessages(activeId!,messageBefore,true)} className="mx-auto block rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-sky-700 shadow-sm disabled:opacity-50">{loadingOlder?'LOADING…':'LOAD OLDER MESSAGES'}</button>}
        {messages.map(m=>{const outbound=String(m.direction||'').toUpperCase()==='OUTBOUND';return <div key={m.whatsapp_message_id} className={`flex w-full ${outbound?'justify-end':'justify-start'}`}>
         <div className={`max-w-[78%] rounded-2xl px-3 py-2 shadow-sm ${outbound?'bg-sky-600 text-white rounded-br-md':'bg-white text-slate-800 rounded-bl-md border border-slate-200'}`}>
           <div className="mb-0.5 text-[9px] font-bold opacity-60">{outbound?'You':'Customer'}</div>
