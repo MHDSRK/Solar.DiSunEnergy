@@ -6,6 +6,7 @@ import {
   storeWhatsAppMessage,
   updateWhatsAppStatus,
   verifyWhatsAppSignature,
+  storeWhatsAppWebhookEvent,
 } from '@/lib/whatsapp'
 
 export const runtime = 'nodejs'
@@ -59,6 +60,30 @@ export async function POST(request: Request) {
 
     const messages = parseWhatsAppInbound(body)
     const statuses = parseWhatsAppStatuses(body)
+    const changes = Array.isArray(body?.entry)
+      ? body.entry.flatMap((entry: any) => Array.isArray(entry?.changes) ? entry.changes : [])
+      : []
+
+    for (const change of changes) {
+      const value = change?.value
+      const phoneNumberId = String(value?.metadata?.phone_number_id || '')
+      for (const message of Array.isArray(value?.messages) ? value.messages : []) {
+        await storeWhatsAppWebhookEvent({
+          eventType: 'message',
+          messageId: message?.id ? String(message.id) : null,
+          phoneNumberId,
+          payload: message,
+        })
+      }
+      for (const status of Array.isArray(value?.statuses) ? value.statuses : []) {
+        await storeWhatsAppWebhookEvent({
+          eventType: 'status:' + String(status?.status || 'unknown'),
+          messageId: status?.id ? String(status.id) : null,
+          phoneNumberId,
+          payload: status,
+        })
+      }
+    }
 
     for (const message of messages) {
       const result = await storeWhatsAppMessage(message)
