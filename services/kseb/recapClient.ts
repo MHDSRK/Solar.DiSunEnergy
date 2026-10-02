@@ -63,8 +63,8 @@ async function getSections() {
   }
 }
 
-export async function resolveKsebSection(input: { sectionId?: string; sectionOffice?: string; district?: string }) {
-  if (input.sectionId) return { sectionId: input.sectionId, name: input.sectionOffice ?? '', districtId: input.district ?? '', districtName: input.district ?? '' }
+export async function resolveKsebSection(input: { sectionId?: string; sectionOffice?: string; districtId?: string; districtName?: string }) {
+  if (input.sectionId) return { sectionId: input.sectionId, name: input.sectionOffice ?? '', districtId: input.districtId ?? '', districtName: input.districtName ?? '' }
   const sections = await getSections()
   const query = input.sectionOffice?.trim().toLocaleLowerCase()
   if (!query) return null
