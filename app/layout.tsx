@@ -5,22 +5,47 @@ import './globals.css'
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://solardisunenergy.vercel.app'
 
 export const metadata: Metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+
   title: 'DiSun Energy International | Solar Power Calculator',
-  description: 'Calculate solar power requirements, review KSEB transformer feasibility, and start your solar installation journey with DiSun Energy International.',
-  alternates: { canonical: '/' },
-  robots: { index: true, follow: true },
+  description:
+    'Calculate solar power requirements, review KSEB transformer feasibility, and start your solar installation journey with DiSun Energy International.',
+
+  manifest: '/manifest.webmanifest',
+
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon',
+  },
+
+  alternates: {
+    canonical: '/',
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+  },
+
   openGraph: {
     type: 'website',
     url: siteUrl,
     title: 'DiSun Energy International | Solar Power Calculator',
-    description: 'Solar power calculator and KSEB transformer feasibility for Kerala customers.',
+    description:
+      'Solar power calculator and KSEB transformer feasibility for Kerala customers.',
     siteName: 'DiSun Energy International',
+    images: ['/opengraph-image'],
   },
+
   twitter: {
     card: 'summary_large_image',
     title: 'DiSun Energy International | Solar Power Calculator',
-    description: 'Solar power calculator and KSEB transformer feasibility for Kerala customers.',
+    description:
+      'Solar power calculator and KSEB transformer feasibility for Kerala customers.',
+    images: ['/twitter-image'],
+  },
+}
   },
 }
 
@@ -46,4 +71,3 @@ export default function RootLayout({
     </html>
   )
 }
-
