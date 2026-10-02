@@ -42,7 +42,8 @@ export async function POST(request: Request) {
 
     const duplicateRows = await sql`
       SELECT lead_id FROM site_visits
-      WHERE phone = ${phone} AND preferred_date = ${date} AND preferred_time = ${time}
+      WHERE preferred_date = ${date} AND preferred_time = ${time}
+      AND status = 'BOOKED'
       AND lead_id <> ${leadId}
       LIMIT 1
     `
