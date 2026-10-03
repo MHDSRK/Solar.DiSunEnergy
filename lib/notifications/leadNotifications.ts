@@ -8,8 +8,6 @@ function format(value: unknown) {
   return value === null || value === undefined || value === '' ? '-' : String(value)
 }
 
-let notificationSchemaPromise: Promise<void> | null = null
-
 async function ensureNotificationSchema() {
   return
 }
@@ -58,36 +56,12 @@ function eventMessage(event: string, lead: LeadRecord) {
   ]
   const messages: Record<string, string[]> = {
     created: ['NEW LEAD CREATED', ...common],
-    calculator: [
-      'CALCULATOR COMPLETED', ...common,
-      `District: ${format(lead.district)}`,
-      `Monthly KWH: ${format(lead.monthly_kwh)}`,
-      `Category: ${format(lead.connection_category)}`,
-      `Recommended: ${format(lead.recommended_kw)} kW`,
-      `Setup Cost: ₹${format(lead.setup_cost)}`,
-      `Subsidy: ₹${format(lead.subsidy)}`,
-      `Financing: ₹${format(lead.financing_amount)}`,
-      `Customer Contribution: ₹${format(lead.customer_contribution)}`,
-    ],
-    feasibility: [
-      'KSEB FEASIBILITY COMPLETED', ...common,
-      `Consumer Number: ${format(lead.kseb_consumer_number)}`,
-      `KSEB District: ${format(lead.kseb_district)}`,
-      `Section: ${format(lead.kseb_section)}`,
-      `Transformer: ${format(lead.transformer)}`,
-      `Status: ${format(lead.feasibility_status)}`,
-      `Requested: ${format(lead.requested_kw)} kW`,
-      `Remaining Capacity: ${format(lead.remaining_transformer_capacity)} kW`,
-    ],
+    calculator: ['CALCULATOR COMPLETED', ...common, `District: ${format(lead.district)}`, `Monthly KWH: ${format(lead.monthly_kwh)}`, `Category: ${format(lead.connection_category)}`, `Recommended: ${format(lead.recommended_kw)} kW`, `Setup Cost: ₹${format(lead.setup_cost)}`, `Subsidy: ₹${format(lead.subsidy)}`, `Financing: ₹${format(lead.financing_amount)}`, `Customer Contribution: ₹${format(lead.customer_contribution)}`],
+    feasibility: ['KSEB FEASIBILITY COMPLETED', ...common, `Consumer Number: ${format(lead.kseb_consumer_number)}`, `KSEB District: ${format(lead.kseb_district)}`, `Section: ${format(lead.kseb_section)}`, `Transformer: ${format(lead.transformer)}`, `Status: ${format(lead.feasibility_status)}`, `Requested: ${format(lead.requested_kw)} kW`, `Remaining Capacity: ${format(lead.remaining_transformer_capacity)} kW`],
     documents: ['DOCUMENTS RECEIVED', ...common, 'All four eligibility documents have been uploaded.'],
-    site_visit: [
-      'SITE VISIT BOOKED', ...common,
-      `Date: ${format(lead.preferred_date)}`,
-      `Time: ${format(lead.preferred_time)}`,
-      `Location: ${format(lead.location)}`,
-    ],
+    site_visit: ['SITE VISIT BOOKED', ...common, `Date: ${format(lead.preferred_date)}`, `Time: ${format(lead.preferred_time)}`, `Location: ${format(lead.location)}`],
   }
-  return messages[event]?.join('\n') ?? ''
+  return messages[event]?.join('\\n') ?? ''
 }
 
 export async function notifyLeadEvent(event: string, lead: LeadRecord) {
@@ -96,10 +70,7 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
   const message = eventMessage(event, lead)
   if (!message) throw new Error(`Unknown lead notification event: ${event}`)
 
-  const results = {
-    googleSheet: { configured: false, saved: false },
-    whatsapp: { configured: false, sent: false },
-  }
+  const results = { googleSheet: { configured: false, saved: false }, whatsapp: { configured: false, sent: false } }
 
   if (event !== 'created' && await claimNotification(eventKey, 'GOOGLE_SHEETS')) {
     try {
@@ -112,20 +83,15 @@ export async function notifyLeadEvent(event: string, lead: LeadRecord) {
     }
   }
 
-  // Automatic lead notifications go to the configured internal recipient, not the lead's phone.
-  // CREATED happens before the form data exists; CALCULATOR is the first event with complete lead details.
   if (event === 'calculator' && await claimNotification(eventKey, 'WHATSAPP')) {
     try {
       results.whatsapp = await sendWhatsAppLeadNotification(lead)
       if (results.whatsapp.sent) await completeNotification(eventKey, 'WHATSAPP')
       else if (!results.whatsapp.configured) await failNotification(eventKey, 'WHATSAPP', 'WhatsApp integration is not configured.')
     } catch (error) {
-      const whatsappCode = error && typeof error === 'object' && 'whatsappCode' in error
-        ? String((error as { whatsappCode?: unknown }).whatsappCode || '')
-        : ''
-      // A transport/database error is ambiguous: Meta may already have accepted the
-      // message, so leave the event PROCESSING instead of retrying and risking a duplicate.
-      if (whatsappCode) await failNotification(eventKey, 'WHATSAPP', error)
+      // Mark all failed attempts as FAILED so they cannot remain stuck in PROCESSING.
+      // The notification claim still prevents concurrent duplicate sends; retries are only allowed for FAILED events.
+      await failNotification(eventKey, 'WHATSAPP', error)
       console.error('WhatsApp lead notification failed', error)
     }
   }
@@ -138,22 +104,7 @@ export async function notifySiteVisit(lead: LeadRecord) {
   const eventKey = `${format(lead.lead_id)}:SITE_VISIT_SHEET`
   if (await claimNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT')) {
     try {
-      const siteVisitResult = await appendSiteVisitToGoogleSheet({
-        lead_id: lead.lead_id,
-        name: lead.name,
-        phone: lead.phone,
-        preferred_date: lead.preferred_date,
-        preferred_time: lead.preferred_time,
-        location: lead.location,
-        district: lead.district,
-        locality: lead.locality,
-        area: lead.area,
-        latitude: lead.latitude,
-        longitude: lead.longitude,
-        status: lead.status,
-        updated_at: lead.updated_at,
-        created_at: lead.created_at,
-      })
+      const siteVisitResult = await appendSiteVisitToGoogleSheet({ lead_id: lead.lead_id, name: lead.name, phone: lead.phone, preferred_date: lead.preferred_date, preferred_time: lead.preferred_time, location: lead.location, district: lead.district, locality: lead.locality, area: lead.area, latitude: lead.latitude, longitude: lead.longitude, status: lead.status, updated_at: lead.updated_at, created_at: lead.created_at })
       if (siteVisitResult.saved) await completeNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT')
       else if (!siteVisitResult.configured) await failNotification(eventKey, 'GOOGLE_SHEETS_SITE_VISIT', 'Google Sheets integration is not configured.')
     } catch (error) {
