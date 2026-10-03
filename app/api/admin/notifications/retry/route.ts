@@ -15,13 +15,17 @@ export async function POST(request: Request) {
     const event = String(body.event ?? '').trim()
     if (!leadId || !allowedEvents.has(event)) return NextResponse.json({ success: false, message: 'Lead ID and a valid notification event are required.' }, { status: 400 })
 
-    await getSql().query(
-      "UPDATE notification_events SET status = 'FAILED', updated_at = NOW() WHERE event_key = $1 AND status <> 'SENT'",
-      [`${leadId}:${event.toUpperCase()}`],
-    )
+    const rows = await getSql().query(
+      "SELECT status FROM notification_events WHERE event_key = $1 AND channel = $2 LIMIT 1",
+      [`${leadId}:${event.toUpperCase()}`, event === 'calculator' ? 'WHATSAPP' : 'GOOGLE_SHEETS'],
+    ) as Record<string, any>[]
+    if (!rows.length) return NextResponse.json({ success: false, message: 'No notification attempt exists for this event.' }, { status: 404 })
+    if (rows[0].status !== 'FAILED') {
+      return NextResponse.json({ success: false, message: 'Only failed notifications can be retried.' }, { status: 409 })
+    }
 
-    const rows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
-    const lead = (rows as unknown as Record<string, unknown>[])[0]
+    const leadRows = await getSql()`SELECT * FROM leads WHERE lead_id = ${leadId} LIMIT 1`
+    const lead = (leadRows as unknown as Record<string, unknown>[])[0]
     if (!lead) return NextResponse.json({ success: false, message: 'Lead not found.' }, { status: 404 })
 
     const result = event === 'site_visit' ? await notifySiteVisit(lead) : await notifyLeadEvent(event, lead)
